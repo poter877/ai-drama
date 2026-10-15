@@ -11,10 +11,11 @@ import path from 'node:path'
 import { db, schema, getInsertId } from '../../db/index.js'
 import { eq } from 'drizzle-orm'
 import { STORAGE_ROOT } from '../../utils/paths.js'
-import { getFilmStyle, type FilmStyle } from '../film-styles.js'
+import { getFilmStyle, filmStyleMarkdown, type FilmStyle } from '../film-styles.js'
 import { FilmError, type FilmArtifact, type FilmRunView, type FilmStageState } from './contracts.js'
 import { filmPipelineDefinition, type FilmPipelineDefinition } from './definitions.js'
 import { generateFilmStageArtifact } from './text.js'
+import { runBuildAgent, readFilmAgentLog } from './build-agent.js'
 import { filmProjectDir, latestFilmRender, startFilmRender } from './render.js'
 
 export function now() {
@@ -249,6 +250,36 @@ async function advance(projectId: number) {
       const project = getFilmProject(projectId)
       const accepted: Record<string, FilmArtifact | null> = {}
       for (let i = 0; i < cursor; i++) accepted[DEFINITION.stages[i]!.id] = stages[i]!.artifact
+
+      // build 阶段：AI SDK Agent 循环（本地工具：写工程文件 + film-core 渲帧自检）
+      if (def.id === 'build') {
+        const build = await runBuildAgent({
+          projectId,
+          styleSlug: project.style.slug,
+          styleMd: filmStyleMarkdown(project.style.slug),
+          systemExtra: `画幅 ${project.aspectRatio}；时长目标 ${project.durationSec} 秒；语言 ${project.language}${project.hasVoice ? '（含配音）' : '（无配音）'}。`,
+          topic: project.topic,
+          language: project.language,
+          durationSec: project.durationSec,
+          aspectRatio: project.aspectRatio,
+          acceptedContent: Object.entries(accepted)
+            .filter(([, v]) => v)
+            .map(([k, v]) => `## ${k}\n${v!.content.slice(0, 8000)}`)
+            .join('\n\n'),
+        })
+        state.artifact = {
+          summary: `影片工程完成（${build.files.length} 个文件）`,
+          content: `已写入文件：\n${build.files.join('\n')}\n\n${build.summary}`,
+          checks: ['index.html 暴露 DUR/render/READY 契约', '渲染一帧自检视觉是否符合 STYLE.md'],
+          data: { files: build.files },
+        }
+        state.error = null
+        state.status = 'review'
+        state.completedAt = now()
+        saveRun(row, { status: 'review', stages: JSON.stringify(stages) })
+        return
+      }
+
       const artifact = await generateFilmStageArtifact({
         stage: def,
         style: project.style,
@@ -262,11 +293,6 @@ async function advance(projectId: number) {
       })
       state.artifact = artifact
       state.error = null
-
-      if (def.id === 'build') {
-        // 把工程产物落盘（artifact.data.files: {path, content}[] 或 content 内嵌代码块）
-        persistFilmProjectFiles(projectId, artifact)
-      }
 
       if (def.review) {
         state.status = 'review'
@@ -285,36 +311,6 @@ async function advance(projectId: number) {
   }
 }
 
-/** build 阶段产物落盘：优先 data.files（[{path,content}]），否则解析 content 中的 fenced code blocks（```path lang） */
-function persistFilmProjectFiles(projectId: number, artifact: FilmArtifact) {
-  const dir = filmProjectDir(projectId)
-  fs.mkdirSync(dir, { recursive: true })
-  const files = (artifact.data?.files as Array<{ path: string; content: string }> | undefined) ?? []
-  let written = files.length
-  for (const f of files) {
-    const safe = path.normalize(f.path).replace(/^(\.\.(\/|\\|$))+/, '')
-    const target = path.join(dir, safe)
-    fs.mkdirSync(path.dirname(target), { recursive: true })
-    fs.writeFileSync(target, f.content)
-  }
-  if (!written) {
-    // 解析 ```<filename> 代码块
-    const re = /```([\w./-]+\.[a-z]{2,4})\s*\n([\s\S]*?)```/g
-    let m: RegExpExecArray | null
-    while ((m = re.exec(artifact.content))) {
-      const target = path.join(dir, path.normalize(m[1]!).replace(/^(\.\.(\/|\\|$))+/, ''))
-      fs.mkdirSync(path.dirname(target), { recursive: true })
-      fs.writeFileSync(target, m[2]!)
-      written++
-    }
-  }
-  if (!written) throw new FilmError('影片工程阶段没有可落盘的文件（需要 index.html）', 502)
-  if (!fs.existsSync(path.join(dir, 'index.html'))) {
-    throw new FilmError('影片工程缺少 index.html（页面契约入口）', 502)
-  }
-}
-
-/** waiting 状态的渲染轮询入口（前端 GET 时顺带驱动） */
 export function pollFilmRun(projectId: number) {
   const row = runRow(projectId)
   if (!row || row.status !== 'waiting') return

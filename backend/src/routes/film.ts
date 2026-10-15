@@ -6,6 +6,8 @@
  * 工程：GET /projects/:id/files（工程文件清单）
  */
 import { Hono } from 'hono'
+import fs from 'node:fs'
+import path from 'node:path'
 import { success, badRequest } from '../utils/response.js'
 import { filmStyleGroups, filmStyles, getFilmStyle, filmStyleMarkdown } from '../services/film-styles.js'
 import {
@@ -16,6 +18,8 @@ import {
   pollFilmRun,
   filmWorkdirListing,
 } from '../services/film-pipeline/runs.js'
+import { readFilmAgentLog } from '../services/film-pipeline/build-agent.js'
+import { filmProjectDir, filmStaticUrl } from '../services/film-pipeline/render.js'
 
 const film = new Hono()
 
@@ -61,6 +65,28 @@ film.get('/projects/:id/files', (c) => {
   if (!Number.isInteger(id) || id <= 0) return badRequest(c, '无效项目 id')
   getFilmProject(id) // 404 校验
   return success(c, { files: filmWorkdirListing(id) })
+})
+
+// build 阶段 agent 日志增量拉取（?since=字节偏移），顺带返回最新自检帧
+film.get('/projects/:id/build/log', (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id) || id <= 0) return badRequest(c, '无效项目 id')
+  getFilmProject(id) // 404 校验
+  const sinceRaw = Number(c.req.query('since'))
+  const since = Number.isFinite(sinceRaw) && sinceRaw >= 0 ? Math.floor(sinceRaw) : 0
+  const log = readFilmAgentLog(id, since)
+  const outDir = path.join(filmProjectDir(id), 'out')
+  const frames = fs.existsSync(outDir)
+    ? fs.readdirSync(outDir).filter((f) => f.startsWith('agent_') && f.endsWith('.jpg'))
+        .map((f) => ({ name: f, mtime: fs.statSync(path.join(outDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime)
+    : []
+  return success(c, {
+    content: log.content,
+    nextOffset: log.nextOffset,
+    size: log.size,
+    latestFrame: frames[0] ? filmStaticUrl(`films/${id}/out/${frames[0]!.name}`) : null,
+  })
 })
 
 export default film

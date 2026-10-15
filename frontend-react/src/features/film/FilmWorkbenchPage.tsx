@@ -2,7 +2,7 @@
  * 影片风格项目工作台：单一流水线（treatment→…→deliver）的阶段推进、
  * review 确认、渲染进度与成片预览。路由 /film/:id。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
@@ -135,6 +135,7 @@ export function FilmWorkbenchPage() {
               key={stage.id}
               stage={stage}
               idx={idx}
+              projectId={projectId}
               language={language}
               expanded={idx === run.cursor || (!stage.artifact && idx < run.cursor)}
             />
@@ -153,11 +154,13 @@ export function FilmWorkbenchPage() {
 function StageCard({
   stage,
   idx,
+  projectId,
   language,
   expanded,
 }: {
   stage: FilmStageState
   idx: number
+  projectId: number
   language: string
   expanded: boolean
 }) {
@@ -205,6 +208,76 @@ function StageCard({
       {open && !stage.artifact && stage.error && (
         <div className="border-t border-outline px-4 py-3 text-xs text-danger">{stage.error}</div>
       )}
+      {open && stage.id === 'build' && stage.status !== 'pending' && (
+        <BuildAgentMonitor projectId={projectId} active={stage.status === 'running'} language={language} />
+      )}
+    </div>
+  )
+}
+
+/** build 阶段的 agent 日志流 + 最新自检帧（增量拉取，运行中 1.5s 轮询） */
+function BuildAgentMonitor({
+  projectId,
+  active,
+  language,
+}: {
+  projectId: number
+  active: boolean
+  language: string
+}) {
+  const [lines, setLines] = useState<string[]>([])
+  const [frame, setFrame] = useState<string | null>(null)
+  const offsetRef = useRef(0)
+  const boxRef = useRef<HTMLPreElement>(null)
+
+  useQuery({
+    queryKey: ['film', 'build-log', projectId],
+    queryFn: async ({ signal }) => {
+      const res = await filmApi.buildLog(projectId, offsetRef.current, signal)
+      // 日志被重置（重试重建）→ 清空已积累内容，从头读
+      if (res.size < offsetRef.current) {
+        offsetRef.current = 0
+        setLines([])
+      }
+      if (res.content) {
+        offsetRef.current = res.nextOffset
+        setLines((prev) => [...prev, ...res.content.replace(/\n$/, '').split('\n')])
+      }
+      if (res.latestFrame) setFrame(res.latestFrame)
+      return res
+    },
+    refetchInterval: active ? 1500 : false,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+  })
+
+  useEffect(() => {
+    const el = boxRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [lines])
+
+  return (
+    <div className="border-t border-outline px-4 py-3">
+      <div className="mb-2 flex items-center gap-2 text-xs text-content-muted">
+        {active && <Spinner size={11} />}
+        {language === 'zh' ? 'Agent 工程日志' : 'Agent build log'}
+        {active && (language === 'zh' ? '（实时）' : ' (live)')}
+      </div>
+      <div className="flex gap-3">
+        <pre
+          ref={boxRef}
+          className="h-60 min-w-0 flex-1 overflow-auto rounded-control bg-elevated p-3 font-code text-xs leading-relaxed whitespace-pre-wrap text-content-secondary"
+        >
+          {lines.length > 0 ? lines.join('\n') : active ? '…' : ''}
+        </pre>
+        {frame && (
+          <img
+            src={frame}
+            alt={language === 'zh' ? '最新自检帧' : 'Latest self-check frame'}
+            className="h-60 w-auto max-w-[45%] rounded-control border border-outline object-contain"
+          />
+        )}
+      </div>
     </div>
   )
 }

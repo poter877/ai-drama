@@ -19,6 +19,7 @@
     "@ai-sdk/openai": "^3.0.48",
     "@hono/node-server": "^1.19.11",
     "@mastra/core": "^1.17.0",
+    "ai": "^7.0.141",
     "better-sqlite3": "^12.4.1",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.1",
@@ -39,6 +40,7 @@
     "@types/uuid": "^10.0.0",
     "drizzle-kit": "^0.31.10",
     "mysql2": "^3.22.5",
+    "playwright-core": "^1.64.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   },

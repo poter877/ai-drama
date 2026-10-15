@@ -88,12 +88,22 @@ export interface FilmProject {
   render: FilmRenderJob | null
 }
 
+/** build 阶段 agent 日志（增量拉取：content 为自 since 起的新增内容） */
+export interface FilmBuildLog {
+  content: string
+  nextOffset: number
+  size: number
+  latestFrame: string | null
+}
+
 export const filmApi = {
   project: (id: number, signal?: AbortSignal) => api.get<FilmProject>(`/film/projects/${id}`, { signal }),
   start: (id: number) => api.post<FilmProject>(`/film/projects/${id}/run`),
   approve: (id: number) => api.post<FilmProject>(`/film/projects/${id}/approve`),
   retry: (id: number) => api.post<FilmProject>(`/film/projects/${id}/retry`),
   files: (id: number, signal?: AbortSignal) => api.get<{ files: string[] }>(`/film/projects/${id}/files`, { signal }),
+  buildLog: (id: number, since: number, signal?: AbortSignal) =>
+    api.get<FilmBuildLog>(`/film/projects/${id}/build/log?since=${since}`, { signal }),
 }
 
 export const filmQueries = {
@@ -120,10 +130,12 @@ export const filmQueries = {
       queryKey: ['film', 'project', id],
       queryFn: ({ signal }) => filmApi.project(id, signal),
       enabled: Number.isInteger(id) && id > 0,
-      // waiting（渲染中）自动轮询；review/running 等待操作不轮询
+      // waiting（渲染中）自动轮询；running（文本/agent 阶段后台推进）低频轮询回读状态
       refetchInterval: (query) => {
         const run = (query.state.data as FilmProject | undefined)?.run
-        return run?.status === 'waiting' ? 3000 : false
+        if (run?.status === 'waiting') return 3000
+        if (run?.status === 'running') return 5000
+        return false
       },
     }),
 }
