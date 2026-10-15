@@ -16,7 +16,7 @@ test('backend provider registry does not expose ChatFire as a model provider', (
   const registry = read('src/services/adapters/registry.ts')
   const ai = read('src/services/ai.ts')
   const aiConfigRoute = read('src/routes/aiConfigs.ts')
-  const useApi = read('../frontend/app/composables/useApi.ts')
+  const useApi = read('../frontend-react/src/entities/ai-config/model.ts')
 
   assert.doesNotMatch(registry, /chatfire/i)
   assert.doesNotMatch(ai, /chatfire/i)
@@ -29,7 +29,7 @@ test('backend provider registry does not expose ChatFire as a model provider', (
 })
 
 test('text agents use the official Gemini provider for gemini configs', () => {
-  const agents = read('src/agents/index.ts')
+  const agents = read('src/services/ai-text.ts')
 
   assert.match(agents, /createGoogleGenerativeAI/)
   assert.match(agents, /providerName === 'gemini'/)
@@ -37,7 +37,7 @@ test('text agents use the official Gemini provider for gemini configs', () => {
 })
 
 test('text agents keep OpenAI provider routing for non-Gemini configs', () => {
-  const agents = read('src/agents/index.ts')
+  const agents = read('src/services/ai-text.ts')
 
   assert.match(agents, /createOpenAI/)
   assert.match(agents, /const provider = createOpenAI\(/)
@@ -56,15 +56,15 @@ test('backend rejects unsupported providers at DB and route boundaries', () => {
   const route = read('src/routes/aiConfigs.ts')
 
   assert.match(ai, /officialProviders/)
-  assert.match(ai, /text:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
-  assert.match(ai, /image:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
-  assert.match(ai, /video:\s*\[\s*'volcengine',\s*'minimax',\s*'aliyun'\s*\]/)
+  assert.match(read('src/services/ai-registry.ts'), /text:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
+  assert.match(read('src/services/ai-registry.ts'), /image:\s*\[\s*'openai',\s*'gemini',\s*'volcengine'\s*\]/)
+  assert.match(read('src/services/ai-registry.ts'), /video:\s*\[\s*'volcengine',\s*'minimax',\s*'aliyun'\s*\]/)
   assert.doesNotMatch(ai, /'deepseek'/)
   assert.doesNotMatch(ai, /'ali'/)
   assert.doesNotMatch(ai, /'vidu'/)
   assert.doesNotMatch(ai, /audio:\s*\[/)
   assert.match(ai, /isOfficialProvider/)
-  assert.match(ai, /isOfficialProvider\(serviceType,\s*r\.provider\)/)
+  assert.match(ai, /resolveServiceRow\(serviceType\)/)
   assert.match(ai, /isOfficialProvider\(row\.serviceType as ServiceType,\s*row\.provider\)/)
 
   assert.match(route, /isOfficialProvider/)
@@ -95,13 +95,12 @@ test('AI config routes reject unsupported service/provider pairs in create, test
   assert.match(updateRoute, /badRequest\(c,\s*'不支持的 service_type\/provider'\)/)
 })
 
-test('AI config update route persists service type changes after validation', () => {
+test('AI config update route rejects changing an existing capability or provider', () => {
   const route = read('src/routes/aiConfigs.ts')
   const updateRoute = routeBlock(route, "app.put('/:id',")
 
   assert.match(updateRoute, /const updates: Record<string, any> = \{ updatedAt: now\(\) \}/)
-  assert.match(updateRoute, /if \('service_type' in body\) updates\.serviceType = body\.service_type/)
-  assert.match(updateRoute, /if \('provider' in body\) updates\.provider = body\.provider/)
+  assert.match(updateRoute, /serviceType !== existing\.serviceType \|\| provider !== existing\.provider/)
 })
 
 test('AI config probe uses provider-specific auth schemes', () => {
@@ -194,4 +193,12 @@ test('new image and video models use their current API shapes', () => {
   assert.match(wanVideo, /\/tasks\/\$\{encodeURIComponent\(taskId\)\}/)
   assert.match(wanVideo, /output\.task_status/)
   assert.match(wanVideo, /output_video_duration/)
+})
+
+test('both engines construct text models through the shared factory', () => {
+  for (const file of ['src/agents/index.ts', 'src/services/creative-planner.ts', 'src/services/creative-chat.ts', 'src/services/creative-pipeline/text.ts']) {
+    const source = read(file)
+    assert.match(source, /getTextModel/)
+    assert.doesNotMatch(source, /createOpenAI|createGoogleGenerativeAI/)
+  }
 })

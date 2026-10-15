@@ -1,12 +1,12 @@
-# 🎬 Huobao Drama - AI ショートドラマ生成プラットフォーム
+# 🎬 Video Factory - AI ショートドラマ生成プラットフォーム
 
 <div align="center">
 
 **TypeScript フルスタックの AI ショートドラマ自動制作プラットフォーム**
 
-[![Node Version](https://img.shields.io/badge/Node.js-20+-339933?style=flat&logo=node.js)](https://nodejs.org)
-[![Vue Version](https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat&logo=vue.js)](https://vuejs.org)
-[![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+[![Node Version](https://img.shields.io/badge/Node.js-22.12+-339933?style=flat&logo=node.js)](https://nodejs.org)
+[![React Version](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react)](https://react.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![ダウンロード](https://img.shields.io/github/v/release/chatfire-AI/huobao-drama?style=flat&logo=github&label=%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89)](https://github.com/chatfire-AI/huobao-drama/releases/latest)
 
 [English](README.md) | [简体中文](README.zh-CN.md) | **日本語** | [한국어](README.ko.md)
@@ -19,7 +19,7 @@
 
 デプロイ後、「設定 → 火宝クイック設定」に Key を貼るだけで、3 つの推奨設定をワンクリックで書き込み
 
-<h3>📥 <a href="https://github.com/chatfire-AI/huobao-drama/releases/latest">デスクトップ版をダウンロード（macOS / Windows）</a></h3>
+<h3>📥 <a href="https://github.com/chatfire-AI/huobao-drama/releases/latest">上流のデスクトップリリース (macOS / Windows)</a></h3>
 <h3>🌐 <a href="https://www.chatfire.site">公式サイト</a></h3>
 
 </div>
@@ -28,7 +28,7 @@
 
 ## 📖 プロジェクト概要
 
-Huobao Drama は AI ベースのショートドラマ自動制作プラットフォームです。脚本生成、キャラクターデザイン、分镜制作から動画合成まで、全工程を自動化します。
+Video Factory は AI ベースのショートドラマ自動制作プラットフォームです。脚本生成、キャラクターデザイン、分镜制作から動画合成まで、全工程を自動化します。
 
 ### 🎯 コアバリュー
 
@@ -40,7 +40,7 @@ Huobao Drama は AI ベースのショートドラマ自動制作プラットフ
 ### 🛠️ 技術アーキテクチャ
 
 ```
-frontend/   — Nuxt 3 + Vue 3 + TypeScript (純粋 CSS、UI フレームワークなし)
+frontend-react/ — React 19 + TypeScript + Vite 7 + Tailwind CSS v4
 backend/    — Hono + Drizzle ORM + Mastra AI Agents + better-sqlite3
 backend/workspace/skills/ — Agent スキル定義 (SKILL.md、UI からオンライン編集可能)
 desktop/    — Electron デスクトップ版（メインプロセス + esbuild バンドル + electron-builder で dmg/exe）
@@ -106,7 +106,7 @@ data/       — 生成アセットと SQLite データベース
 
 | ソフトウェア | バージョン | 説明 |
 |---|---|---|
-| **Node.js** | 20+ | フロントエンド・バックエンド実行環境 |
+| **Node.js** | 22.12+ | フロントエンド・バックエンド実行環境 |
 | **npm** | 9+ | パッケージマネージャー |
 
 > **データベース不要**：SQLite 内蔵（プロジェクトのデータディレクトリに単一ファイル）。データベースサーバーのインストールは不要です。
@@ -123,7 +123,7 @@ data/       — 生成アセットと SQLite データベース
 | `STORAGE_PATH` | `<リポジトリ>/data/static` | 生成ファイルの保存ディレクトリ |
 | `HUOBAO_DATA_DIR` | — | デスクトップ版で Electron メインプロセスが注入（userData データルート） |
 | `WORKSPACE_PATH` | `backend/workspace` | Agent スキル/プロンプトディレクトリ（デスクトップ版は userData の書き込み可能なコピー） |
-| `FRONTEND_DIST` | `frontend/dist` | フロントエンド静的ビルドディレクトリ |
+| `FRONTEND_DIST` | `frontend-react/dist` | フロントエンド静的ビルドディレクトリ |
 | `FFMPEG_BIN` / `FFPROBE_BIN` | npm 内蔵バイナリ | カスタム ffmpeg/ffprobe の実行ファイルパス |
 | `PUBLIC_BASE_URL` | — | Seedance がローカル参照リソースを使う際に必要な公開 URL（サーバーデプロイ用） |
 
@@ -140,7 +140,7 @@ cd huobao-drama
 cd backend && npm install
 
 # フロントエンドの依存をインストール
-cd ../frontend && npm install
+cd ../frontend-react && npm install
 ```
 
 ### 🎯 起動
@@ -155,11 +155,11 @@ cd backend
 npm run dev
 
 # ターミナル 2：フロントエンド
-cd frontend
+cd frontend-react
 npm run dev
 ```
 
-- フロントエンド：`http://localhost:3013`
+- フロントエンド：`http://localhost:3014`
 - バックエンド API：`http://localhost:5679/api/v1`
 - フロントエンドは `/api` と `/static` をバックエンドへ自動プロキシ
 
@@ -168,15 +168,11 @@ npm run dev
 バックエンドが API とフロントエンド静的ファイルの両方を提供：
 
 ```bash
-# 1. フロントエンドをビルド
-cd frontend && npm run generate
+# 1. React フロントエンドをビルド
+npm run build:frontend
 
-# 2. ビルド成果物をバックエンドが読むディレクトリへコピー
-#    （generate の出力は .output/public、バックエンドは frontend/dist を読む）
-cp -r .output/public dist
-
-# 3. バックエンドを起動
-cd ../backend && npm start
+# 2. バックエンドを起動（frontend-react/dist を自動配信）
+npm --prefix backend start
 ```
 
 アクセス：`http://localhost:5679`
@@ -284,6 +280,8 @@ cd backend && npx tsx scripts/import-mysql-to-sqlite.ts
 
 ### 🖥️ デスクトップアプリ（推奨）
 
+> 以下のダウンロードリンクは上流の Huobao Drama リリースを参照しています。現在の動画工場の名称と MIT ライセンスで利用するには、以下のソースからのビルド手順を使用してください。既存のプロジェクトと設定を引き継ぐため、データディレクトリ名 `HuobaoDrama` は維持します。
+
 **⬇️ ビルド済みインストーラー: [GitHub Releases](https://github.com/chatfire-AI/huobao-drama/releases/latest) · [中国向けミラー（Tencent COS）](https://installer.chatfire.site/huobao-drama/v4.0.5/)**
 
 | プラットフォーム | ダウンロードファイル |
@@ -308,21 +306,21 @@ curl -L -o /tmp/HuobaoDrama.dmg https://installer.chatfire.site/huobao-drama/v4.
 ダブルクリックでインストール、すぐに使えるデスクトップ版（macOS + Windows）。データベース（SQLite）、生成メディア、Agent スキルはすべてユーザーデータディレクトリに保存され、アプリをアンインストールしてもデータに影響しません。
 
 ```bash
-# ワンコマンドパッケージ（フロントエンド generate → バックエンド esbuild → electron-builder）
+# ワンコマンドパッケージ（フロントエンド Vite build → バックエンド esbuild → electron-builder）
 npm run dist        # macOS dmg（arm64 + Intel）
 npm run dist:win    # Windows NSIS インストーラー（win-x64、macOS 上でクロスビルド可能）
 
 # 成果物
-# desktop/release/HuobaoDrama-<バージョン>-arm64.dmg      (Apple Silicon)
-# desktop/release/HuobaoDrama-<バージョン>.dmg            (Intel)
-# desktop/release/HuobaoDrama Setup <バージョン>.exe      (Windows)
+# desktop/release/视频工厂-<バージョン>-arm64.dmg      (Apple Silicon)
+# desktop/release/视频工厂-<バージョン>.dmg            (Intel)
+# desktop/release/视频工厂 Setup <バージョン>.exe      (Windows)
 ```
 
 インストール時の注意：
 
 - macOS 未署名パッケージは初回起動時に「Appが壊れているため開けません」と表示される場合があります（Apple Silicon で多発）。これは Gatekeeper の隔離属性によるもので、ファイルは壊れていません。修復方法は 2 つあります：
   1. **dmg に修復スクリプトを同梱**：アプリを「アプリケーション」にドラッグした後、dmg ウィンドウ下部の「如提示已损坏请双击我.command」をダブルクリックすれば自動で修復されます；
-  2. またはターミナルで `sudo xattr -cr /Applications/HuobaoDrama.app` を実行。
+  2. またはターミナルで `sudo xattr -cr /Applications/视频工厂.app` を実行。
 
   修復は初回の 1 回だけ。その後は普通に起動でき、アプリ内自動更新にも影響しません。
 - Windows 未署名パッケージは SmartScreen で「詳細情報 → 実行」を選択
@@ -351,8 +349,7 @@ cd desktop && npm run feed
 デスクトップ版の開発デバッグ：
 
 ```bash
-npm run build:frontend   # フロントエンド静的成果物（frontend/.output/public）
-cd desktop && npm run dev  # バックエンドをバンドルして Electron ウィンドウで実行
+npm run dev:desktop
 ```
 
 > 既知の制限：Seedance 動画モデルがローカル参照リソースを使うには `PUBLIC_BASE_URL` の公開アドレスが必要です。デスクトップ版には公開エントリがないため、このシナリオでは明確なエラーメッセージが表示されます。テキスト→動画・画像生成など他の機能には影響しません。
@@ -362,15 +359,11 @@ cd desktop && npm run dev  # バックエンドをバンドルして Electron �
 ### 🏭 サーバーデプロイ
 
 ```bash
-# 1. フロントエンドをビルド
-cd frontend && npm run generate
+# 1. React フロントエンドをビルド
+npm run build:frontend
 
-# 2. ビルド成果物をコピー（generate の出力は frontend/.output/public、バックエンドは
-#    frontend/dist を読む。この手順を省くと API は動くがページが 404 になる）
-cp -r .output/public dist && cd ..
-
-# 3. バックエンドを起動
-cd backend && npm start
+# 2. バックエンドを起動（frontend-react/dist を自動配信）
+npm --prefix backend start
 ```
 
 サーバーにアップロードするファイル：
@@ -378,7 +371,7 @@ cd backend && npm start
 ```
 backend/                    # バックエンドソース + node_modules
 backend/workspace/skills/   # Agent スキルファイル
-frontend/dist/              # フロントエンドビルド成果物
+frontend-react/dist/              # フロントエンドビルド成果物
 data/                       # データディレクトリ（初回実行時に自動作成）
 ```
 
@@ -414,37 +407,19 @@ server {
 
 > メディア読み込みの最適化：画像生成時にバックエンドが 400px サムネイル（`*_thumb.webp`）を自動生成してリストページで使用し、動画はポスターフレーム（`*_poster.jpg`）をカバーとして抽出します。フロントエンドは画像を開く/再生する時だけ元ファイルを読み込みます。過去の既存ファイルは `backend/` で `npm run backfill-artwork` を実行して一括補完できます。
 
-### 🐳 Docker デプロイ（アプリ内更新付き）
+### 🐳 Docker デプロイ（React ソースビルド）
 
-**方法 A — ビルド済みイメージ（クローン・ビルド不要）**：マルチアーキテクチャ（`linux/amd64` + `linux/arm64`）、x86 サーバーと ARM デバイスの両方に自動対応
-
-```bash
-docker pull huobao/huobao-drama:4.0.6
-
-docker run -d \
-  --name huobao-drama \
-  -p 5679:5679 \
-  -v huobao-data:/app/data \
-  --restart unless-stopped \
-  huobao/huobao-drama:4.0.6
-```
-
-**方法 B — docker compose（ソースビルド + Watchtower アプリ内更新）**：リポジトリルートにオールインワンの `Dockerfile`（フロントエンド generate + バックエンド依存/ランタイムの 3 ステージ。バックエンドはサーバーデプロイと同様に tsx で実行）と `docker-compose.yml`（アプリ + Watchtower）を用意：
+既定の `video-factory:local` イメージは現在のソースからビルドします。Compose は `pull_policy: build` を使用し、イメージ内で React フロントエンドをビルドします。
 
 ```bash
-# 1. 環境を設定（Watchtower トークン。app と watchtower の両側で一致必須）
-cp .env.example .env   # WATCHTOWER_TOKEN を変更
-
-# 2. ビルドして起動（リリース時にバージョンを注入し、「关于更新」での比較に使用）
-HUOBAO_VERSION=4.0.5 docker compose up -d --build
-
-# 3. http://localhost:5679 にアクセス
+cp .env.example .env
+docker compose up -d --build
+# http://localhost:5679 を開く
 ```
 
-- **データ永続化**：名前付きボリューム `huobao-data` を `/app/data` にマウント（SQLite + 生成画像/動画 + workspace/skills）。イメージ更新でもデータを失いません
-- **アプリ内更新**：compose に [Watchtower](https://containrrr.dev/watchtower/) sidecar を同梱（`--label-enable` でラベル付きコンテナのみ更新、`--cleanup` で旧イメージ削除、毎日セルフチェック）。「設定 → 关于更新」で新バージョンの確認と「今すぐ更新」が可能。バックエンドが Watchtower HTTP API 経由でトリガーし、新イメージを pull してコンテナを再構築。数分後にページを更新すれば完了です
-- **手動モード**：`docker-compose.yml` から app の `HUOBAO_WATCHTOWER_*` の 2 つの環境変数（または watchtower サービス全体）を削除すると、「关于更新」は新バージョン通知 + 手動コマンド `docker compose pull && docker compose up -d` に退化します
-- **イメージの公開**：`docker buildx build --platform linux/amd64,linux/arm64 --build-arg HUOBAO_VERSION=x.y.z -t huobao/huobao-drama:x.y.z -t huobao/huobao-drama:latest --push .`。バージョンマニフェストはデスクトップ版と GitHub Releases の `latest.json` を共用（`HUOBAO_UPDATE_FEED` で上書き可能）
+既存の `huobao-data` ボリュームにデータベース、メディア、workspace を保存します。更新時はソースを更新してから `docker compose up -d --build` を再実行してください。
+
+イメージ自動更新は任意です。独自の React イメージを公開し、`VIDEO_FACTORY_IMAGE` に指定します。`HUOBAO_WATCHTOWER_URL=http://watchtower:8080` と独自の `WATCHTOWER_TOKEN` を設定し、`docker compose --profile auto-update up -d --build` で起動してください。独立したリリース情報は `HUOBAO_UPDATE_FEED` で指定できます。既定では Watchtower は起動しません。
 
 ---
 
@@ -466,12 +441,14 @@ HUOBAO_VERSION=4.0.5 docker compose up -d --build
 
 ### フロントエンド
 
-- **フレームワーク**：Nuxt 3（SPA モード）
-- **言語**：Vue 3 + TypeScript
-- **ルーティング**：ファイルルーティング（Vue Router 4）
-- **スタイル**：純粋 CSS + CSS Variables
-- **アイコン**：Lucide Vue
-- **i18n**：vue-i18n（中文 / English / 日本語 / 한국어）
+- **フレームワーク**：React 19 + Vite 7（SPA）
+- **言語**：TypeScript（strict）
+- **ルーティング**：React Router 7
+- **サーバー状態**：TanStack Query v5
+- **クライアント状態**：Zustand v5
+- **スタイル**：Tailwind CSS v4 + デザイントークン
+- **アイコン**：Lucide React
+- **i18n**：i18next + react-i18next（中文 / English / 日本語 / 한국어）
 
 ---
 
@@ -495,7 +472,7 @@ A: 初回デプロイ時の正常な案内です。「設定」ページで「�
 
 ### Q: フロントエンドがバックエンド API に接続できない？
 
-A: バックエンドが起動しているか、ポートが正しいかを確認してください。開発モードのプロキシ設定は `frontend/nuxt.config.ts` にあります。
+A: バックエンドが起動しているか、ポートが正しいかを確認してください。開発モードのプロキシ設定は `frontend-react/vite.config.ts` にあります。
 
 ### Q: データベーステーブルが作成されない？
 
@@ -590,13 +567,11 @@ A: バックエンドは初回起動時に全テーブルを自動作成しま�
 
 ## 📄 ライセンス
 
-本プロジェクトは **[CC BY-NC-SA 4.0](LICENSE)**（表示-非営利-継承 4.0 国際）ライセンスを採用しています。
+本プロジェクトは **[MIT ライセンス](LICENSE)** で公開されています。
 
-- ✅ 個人利用、学習・研究、非営利プロジェクトでの使用は自由です
-- ✅ 改変と再配布は可能ですが、クレジット表示と同一ライセンスでの共有が必要です
-- ❌ **商用利用は禁止**——作者の書面による許可なく、本プロジェクトの全部または一部をいかなる商業目的（有料サービス、商用デプロイ、転売など）にも使用することはできません
+商用利用を含め、ソフトウェアの使用、複製、変更、配布、再許諾、販売が可能です。複製または実質的な部分には著作権表示とライセンス表示を含めてください。ソフトウェアは無保証で現状のまま提供されます。
 
-ライセンス全文は [LICENSE](LICENSE) を参照してください。
+全文は [LICENSE](LICENSE) を参照してください。
 
 ---
 
@@ -614,7 +589,7 @@ Issue と Pull Request を歓迎します！
 
 ```bash
 cd backend && npm run typecheck
-cd ../frontend && npm run build
+cd ../frontend-react && npm run build
 ```
 
 ---

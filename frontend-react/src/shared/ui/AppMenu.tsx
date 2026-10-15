@@ -1,11 +1,10 @@
 /**
- * AppMenu — 全站统一的下拉菜单面板（Portal + 统一定位/动效/层级）。
+ * AppMenu — Radix Popover 管理定位、碰撞避让、外部点击和嵌套弹窗焦点。
  * 触发器由调用方通过 trigger 渲染属性自定义（保留各自形态），只统一菜单层。
  * 菜单项请使用 AppMenuItem。
  */
-import { createPortal } from 'react-dom'
-import type { ReactNode } from 'react'
-import { useFloatingPanel } from '@/shared/lib/use-floating-panel'
+import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import * as PopoverPrimitive from '@radix-ui/react-popover'
 
 interface AppMenuProps {
   open?: boolean
@@ -32,42 +31,64 @@ export function AppMenu({
   trigger,
   children,
 }: AppMenuProps) {
-  const panel = useFloatingPanel({ placement, matchWidth, minWidth, maxHeight })
-  const isOpen = controlledOpen ?? panel.isOpen
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isOpen = controlledOpen ?? uncontrolledOpen
+  const side = placement.startsWith('top') ? 'top' : 'bottom'
+  const align = placement.endsWith('end') ? 'end' : placement.endsWith('start') ? 'start' : 'center'
 
   function setOpen(next: boolean) {
     if (controlledOpen === undefined) {
-      if (next) panel.open()
-      else panel.close()
+      setUncontrolledOpen(next)
     }
     onOpenChange?.(next)
   }
 
+  function onMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
+    if ((event.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled):not([aria-disabled="true"])'))
+    if (!items.length) return
+    event.preventDefault()
+    event.stopPropagation()
+    const current = items.findIndex((item) => item === event.currentTarget.ownerDocument.activeElement)
+    const next = event.key === 'Home' ? 0
+      : event.key === 'End' ? items.length - 1
+        : event.key === 'ArrowDown' ? (current + 1) % items.length
+          : current <= 0 ? items.length - 1 : current - 1
+    items[next]?.focus()
+  }
+
   return (
-    <>
-      <span
-        ref={panel.anchorRef}
-        className={`inline-flex min-w-0${block ? ' flex w-full' : ''}`}
-        onClick={() => setOpen(!isOpen)}
-      >
-        {trigger({ open: isOpen })}
+    <PopoverPrimitive.Root open={isOpen} onOpenChange={setOpen}>
+      <span className={block ? 'flex w-full min-w-0' : 'inline-flex min-w-0'}>
+        <PopoverPrimitive.Trigger asChild aria-haspopup="menu">
+          {trigger({ open: isOpen })}
+        </PopoverPrimitive.Trigger>
       </span>
-      {createPortal(
-        isOpen ? (
-          <div
-            ref={panel.panelRef}
-            className={`z-[var(--hb-z-menu)] flex flex-col overflow-y-auto rounded-panel border border-outline bg-surface p-[5px] shadow-raised outline-none ${
-              panel.placement === 'top' ? 'animate-menu-in-top' : 'animate-menu-in'
-            }`}
-            style={panel.panelStyle}
-            data-placement={panel.placement}
-            role="menu"
-          >
-            {children}
-          </div>
-        ) : null,
-        document.body,
-      )}
-    </>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          side={side}
+          align={align}
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-[var(--hb-z-menu)] flex max-w-[calc(100vw-24px)] flex-col overflow-y-auto rounded-panel border border-outline bg-surface p-[5px] shadow-raised outline-none data-[side=top]:animate-menu-in-top data-[side=bottom]:animate-menu-in"
+          style={{
+            minWidth,
+            width: matchWidth ? 'var(--radix-popover-trigger-width)' : undefined,
+            maxHeight: `min(${maxHeight}px, var(--radix-popover-content-available-height))`,
+          }}
+          role="menu"
+          onKeyDown={onMenuKeyDown}
+          onClick={(event) => {
+            const item = (event.target as Element).closest('[role="menuitem"]')
+            if (!event.defaultPrevented && item && !item.matches(':disabled, [aria-disabled="true"]')) setOpen(false)
+          }}
+        >
+          {children}
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   )
 }

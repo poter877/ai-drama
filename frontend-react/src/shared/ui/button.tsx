@@ -12,7 +12,7 @@ import { cn } from '@/shared/lib/cn'
 
 export const buttonVariants = cva(
   // base：高度/字体/圆角/焦点/disabled/motion
-  'inline-flex items-center justify-center gap-1.5 rounded-pill ' +
+  'inline-flex appearance-none items-center justify-center gap-1.5 rounded-pill border-0 ' +
     'font-ui font-semibold text-ui leading-none whitespace-nowrap select-none ' +
     'tracking-[-0.01em] no-underline cursor-pointer ' +
     'transition-[background,color,box-shadow,transform] duration-150 ease-app ' +

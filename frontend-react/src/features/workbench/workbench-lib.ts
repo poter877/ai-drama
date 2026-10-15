@@ -1,6 +1,6 @@
 /**
  * 工作台纯函数库：模型选项收集、分辨率档位、参考图序号映射、视频任务状态机等。
- * 从 episode.vue 提取，配契约测试（模型/配置归属、参考上限与 @名字→@图片N 映射）。
+ * 工作台纯函数，配契约测试（模型/配置归属、参考上限与 @名字→@图片N 映射）。
  */
 import type { Character, Prop, Scene } from '@/entities/asset/model'
 import type { Storyboard } from '@/entities/storyboard/model'

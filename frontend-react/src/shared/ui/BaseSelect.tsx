@@ -2,7 +2,7 @@
  * BaseSelect — 可搜索下拉（支持扁平/分组选项）。
  * 简单下拉（searchable=false）与搜索型下拉共用本组件，受控 value/onChange。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, Search } from 'lucide-react'
 import { AppMenu } from './AppMenu'
@@ -53,7 +53,6 @@ export function BaseSelect({ value, onChange, options, placeholder, searchable =
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [highlighted, setHighlighted] = useState(-1)
-  const searchRef = useRef<HTMLInputElement | null>(null)
 
   const groups = useMemo(() => normalize(options), [options])
 
@@ -75,14 +74,13 @@ export function BaseSelect({ value, onChange, options, placeholder, searchable =
     return ''
   }, [groups, value])
 
-  // 打开时初始化键盘高亮并聚焦搜索框（定位/关闭由 AppMenu 负责）
-  useEffect(() => {
-    if (isOpen) {
-      setHighlighted(flatOptions.findIndex((o) => o.value === value))
+  function onOpenChange(open: boolean) {
+    if (open) {
+      setHighlighted(groups.flatMap((group) => group.options).findIndex((option) => option.value === value))
       setQuery('')
-      requestAnimationFrame(() => searchRef.current?.focus())
     }
-  }, [isOpen, flatOptions, value])
+    setIsOpen(open)
+  }
 
   function pick(opt: SelectOption) {
     onChange(String(opt.value))
@@ -90,6 +88,7 @@ export function BaseSelect({ value, onChange, options, placeholder, searchable =
   }
 
   function onSearchKeydown(e: React.KeyboardEvent) {
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setHighlighted((h) => Math.min(h + 1, flatOptions.length - 1))
@@ -100,14 +99,12 @@ export function BaseSelect({ value, onChange, options, placeholder, searchable =
       e.preventDefault()
       const opt = flatOptions[highlighted]
       if (opt) pick(opt)
-    } else if (e.key === 'Escape') {
-      setIsOpen(false)
     }
   }
 
   return (
     <div className="flex w-full min-w-0">
-      <AppMenu open={isOpen} onOpenChange={setIsOpen} block matchWidth minWidth={132} maxHeight={380}
+      <AppMenu open={isOpen} onOpenChange={onOpenChange} block matchWidth minWidth={132} maxHeight={380}
         trigger={({ open }) => (
           <button
             type="button"
@@ -128,11 +125,10 @@ export function BaseSelect({ value, onChange, options, placeholder, searchable =
           <div className="mt-[-5px] mb-0 flex items-center gap-2 rounded-t-panel border-b border-outline px-3 py-2 text-content-muted">
             <Search size={12} />
             <input
-              ref={searchRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setHighlighted(0) }}
               onKeyDown={onSearchKeydown}
-              className="flex-1 border-none bg-transparent font-ui text-[13px] text-content outline-none placeholder:text-content-subtle"
+              className="min-w-0 flex-1 border-none bg-transparent font-ui text-[13px] text-content outline-none placeholder:text-content-subtle"
               placeholder={t('components.baseSelect.search')}
             />
           </div>

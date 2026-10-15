@@ -1,25 +1,28 @@
 {
-  "name": "huobao-drama-desktop",
-  "productName": "HuobaoDrama",
+  "name": "video-factory-desktop",
+  "productName": "视频工厂",
   "version": "4.0.8",
   "private": true,
-  "description": "火宝短剧桌面版（Electron 壳）",
+  "description": "视频工厂桌面版（Electron 壳）",
+  "license": "MIT",
   "author": "Huobao",
   "main": "dist/main.js",
   "scripts": {
+    "build:frontend": "npm --prefix ../frontend-react run build",
     "build:backend": "node scripts/build-backend.mjs",
     "build:main": "node scripts/build-main.mjs",
     "rebuild:native": "electron-builder install-app-deps",
     "postinstall": "electron-builder install-app-deps",
-    "dev": "npm run build:backend && npm run build:main && electron .",
-    "dist": "npm run build:backend && npm run build:main && node scripts/prepare-resources.mjs && electron-builder --mac",
-    "dist:win": "npm run build:backend && npm run build:main && node scripts/prepare-resources.mjs && electron-builder --win",
+    "dev": "npm run build:frontend && npm run build:backend && npm run build:main && electron .",
+    "dist": "npm run build:frontend && npm run build:backend && npm run build:main && node scripts/prepare-resources.mjs && electron-builder --mac",
+    "dist:win": "npm run build:frontend && npm run build:backend && npm run build:main && node scripts/prepare-resources.mjs && electron-builder --win",
     "feed": "node scripts/make-update-feed.mjs",
     "publish": "node scripts/publish-release.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",

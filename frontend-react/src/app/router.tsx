@@ -1,6 +1,5 @@
 /**
- * 路由表 — 与旧前端完全一致的四条 URL：
- * / 、/settings、/drama/:id、/drama/:id/episode/:episodeNumber。
+ * 项目启动台统一管理短剧与创意视频；各类型拥有独立工作页面。
  * episode 使用 studio 布局（全屏）；其余使用 default 布局（顶栏壳）。
  * 路由组件 lazy 分包；无效参数呈现明确错误态（各 Route 内部处理）。
  */
@@ -14,6 +13,7 @@ const ProjectsRoute = lazy(() => import('@/routes/projects/ProjectsRoute'))
 const SettingsRoute = lazy(() => import('@/routes/settings/SettingsRoute'))
 const DramaDetailRoute = lazy(() => import('@/routes/drama/DramaDetailRoute'))
 const EpisodeWorkbenchRoute = lazy(() => import('@/routes/episode/EpisodeWorkbenchRoute'))
+const CreativeRoute = lazy(() => import('@/routes/creative/CreativeRoute'))
 
 export const router = createBrowserRouter([
   {
@@ -23,6 +23,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <ProjectsRoute /> },
       { path: '/settings', element: <SettingsRoute /> },
       { path: '/drama/:id', element: <DramaDetailRoute /> },
+      { path: '/creative/:id', element: <CreativeRoute /> },
     ],
   },
   {

@@ -3,6 +3,8 @@ import { and, eq, isNull, like, desc } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, badRequest, notFound, created, now } from '../utils/response.js'
 import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
+import { z } from 'zod'
+import { aspectRatioSchema, creativeCategorySchema, createCreativeDocument } from '../services/creative-model.js'
 
 const app = new Hono()
 
@@ -51,22 +53,38 @@ app.get('/', async (c) => {
 // POST /dramas - Create drama
 app.post('/', async (c) => {
   const body = await c.req.json()
+  const parsed = z.object({
+    title: z.string().trim().min(1).max(200),
+    project_type: z.enum(['drama', 'creative']).default('drama'),
+    creative_category: creativeCategorySchema.nullish(),
+    aspect_ratio: aspectRatioSchema.default('16:9'),
+    style: z.string().max(100).optional(),
+  }).safeParse(body)
+  if (!parsed.success) return badRequest(c, parsed.error.issues.map(issue => issue.message).join('；'))
+  if (parsed.data.project_type === 'creative' && !parsed.data.creative_category) return badRequest(c, '请选择创意视频用途')
+  if (parsed.data.project_type === 'drama' && parsed.data.creative_category) return badRequest(c, '短剧项目不能设置创意视频用途')
   const ts = now()
-  const res = await db.insert(schema.dramas).values({
-    title: body.title,
-    description: body.description,
-    genre: body.genre,
-    style: body.style,
-    aspectRatio: body.aspect_ratio || '16:9',
-    tags: body.tags ? JSON.stringify(body.tags) : null,
-    metadata: body.metadata,
-    status: 'draft',
-    createdAt: ts,
-    updatedAt: ts,
+  const result = db.transaction(tx => {
+    const res = tx.insert(schema.dramas).values({
+      title: parsed.data.title,
+      projectType: parsed.data.project_type,
+      creativeCategory: parsed.data.creative_category || null,
+      description: body.description,
+      genre: body.genre,
+      style: parsed.data.style,
+      aspectRatio: parsed.data.aspect_ratio,
+      tags: body.tags ? JSON.stringify(body.tags) : null,
+      metadata: body.metadata,
+      status: 'draft',
+      createdAt: ts,
+      updatedAt: ts,
+    }).run()
+    const id = getInsertId(res)
+    if (parsed.data.project_type === 'creative') tx.insert(schema.creativeProjects).values({
+      projectId: id, document: JSON.stringify(createCreativeDocument(parsed.data.creative_category!)), revision: 1, updatedAt: ts,
+    }).run()
+    return tx.select().from(schema.dramas).where(eq(schema.dramas.id, id)).get()!
   })
-
-  const [result] = await db.select().from(schema.dramas)
-    .where(eq(schema.dramas.id, getInsertId(res)))
 
   // 不再预建集 — 用户通过「添加集」流程创建（该流程会锁定图片/视频生成配置）
   return created(c, toSnakeCase(result))
@@ -89,7 +107,7 @@ app.get('/stats', async (c) => {
 app.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [drama] = await db.select().from(schema.dramas).where(eq(schema.dramas.id, id))
-  if (!drama) return notFound(c, '剧本不存在')
+  if (!drama || drama.deletedAt) return notFound(c, '剧本不存在')
 
   const eps = await db.select().from(schema.episodes)
     .where(and(eq(schema.episodes.dramaId, id), isNull(schema.episodes.deletedAt)))
@@ -114,6 +132,16 @@ app.get('/:id', async (c) => {
 app.put('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json()
+  const project = db.select().from(schema.dramas).where(eq(schema.dramas.id, id)).get()
+  if (!project || project.deletedAt) return notFound(c, '项目不存在')
+  if (project.projectType === 'creative') {
+    if (Object.keys(body).length !== 1 || !['draft', 'active', 'in_progress', 'completed', 'archived'].includes(body.status)) {
+      return badRequest(c, '请在创意视频工作台保存项目，避免覆盖未确认的方案')
+    }
+    await db.update(schema.dramas).set({ status: body.status, updatedAt: now() }).where(eq(schema.dramas.id, id))
+    return success(c)
+  }
+  if (body.project_type !== undefined || body.creative_category !== undefined) return badRequest(c, '创建后不能更改项目类型')
   const updates: Record<string, any> = { updatedAt: now() }
   if (body.title !== undefined) updates.title = body.title
   if (body.description !== undefined) updates.description = body.description
@@ -154,6 +182,9 @@ app.put('/:id/characters', async (c) => {
 // PUT /dramas/:id/episodes - Save episodes
 app.put('/:id/episodes', async (c) => {
   const dramaId = Number(c.req.param('id'))
+  const project = db.select().from(schema.dramas).where(eq(schema.dramas.id, dramaId)).get()
+  if (!project || project.deletedAt) return notFound(c, '项目不存在')
+  if (project.projectType === 'creative') return badRequest(c, '创意视频项目不使用剧集，请进入创意视频工作台')
   const body = await c.req.json()
   const episodes = body.episodes || []
   const ts = now()

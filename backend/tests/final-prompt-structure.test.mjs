@@ -34,11 +34,10 @@ test('grid prompt agent tools save agent-written final prompts with style inject
 
 test('prompt agent instructions reference per-asset skills; skill files define the specs', () => {
   const agents = read('src/agents/index.ts')
-  const settings = read('../frontend/app/pages/settings.vue')
   const charSkill = read('workspace/skills/prompt-generator/character-prompt/SKILL.md')
   const sceneSkill = read('workspace/skills/prompt-generator/scene-prompt/SKILL.md')
 
-  for (const src of [agents, settings]) {
+  for (const src of [agents]) {
     // 三类图片规范入口（具体创作规则在各自 SKILL.md 中）
     assert.match(src, /角色三视图/)
     assert.match(src, /场景固定视角/)

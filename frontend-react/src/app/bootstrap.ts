@@ -1,6 +1,6 @@
 /**
  * 应用引导：i18n 初始化、tokens/tour 主题样式、启动时预取引导标记。
- * 旧前端由两个 Nuxt 客户端插件（i18n.client/tour.client）自动注入的工作在此显式完成。
+ * React 挂载前显式完成应用初始化。
  */
 import { hydrateTours } from '@/shared/lib/tour'
 

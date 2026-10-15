@@ -47,6 +47,9 @@ temp/
 /CLAUDE.md
 /AGENTS.md
 
+# Local reference repositories
+/references/
+
 # Agent workspace (skills/prompts 为策划模板保持跟踪，其余产出忽略)
 backend/workspace/*
 !backend/workspace/skills/

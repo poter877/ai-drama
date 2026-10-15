@@ -13,6 +13,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { qk } from '@/shared/api/query-keys'
 import { aiConfigApi, type AiConfig, type ConfigTestResult, type ServiceType } from '@/entities/ai-config/model'
+import { toolboxQueries } from '@/entities/creative/toolbox'
 import { toastError } from '@/shared/lib/errors'
 import { providerIconUrl } from '@/shared/lib/provider-icons'
 import { useTheme } from '@/shared/config/theme'
@@ -22,11 +23,10 @@ import { BaseSelect } from '@/shared/ui/BaseSelect'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
 import { cardVariants } from '@/shared/ui/card'
-import { Input } from '@/shared/ui/input'
+import { Input, Textarea } from '@/shared/ui/input'
 import { Switch } from '@/shared/ui/switch'
 import { cn } from '@/shared/lib/cn'
 
-const PROVIDERS = ['gemini', 'openai', 'volcengine', 'minimax', 'aliyun'] as const
 
 // settings-scroll 直接子元素限宽居中；card + card 间距 14px
 const PANEL_SCROLL = 'h-full overflow-y-auto px-7 pt-5 pb-12 animate-fade-up'
@@ -122,7 +122,13 @@ const TEST_RESULT_META = 'font-code text-[11px] text-content-muted break-all'
 const ICON_BTN_SM = 'h-[30px] min-h-[30px] w-[30px] min-w-[30px]'
 
 /** 厂商预设模板（配置名持久化进 DB：provider 英文 + 服务类型英文，不随界面语言漂移） */
-const PROVIDER_PRESETS: Record<ServiceType, Record<string, { label: string; baseUrl: string; models: string[] }>> = {
+const PROVIDER_PRESETS: Record<ServiceType, Record<string, { label: string; baseUrl: string; models: string[]; requiresApiKey?: boolean }>> = {
+  speech: { openai: { label: 'OpenAI 语音合成', baseUrl: 'https://api.openai.com', models: ['gpt-4o-mini-tts', 'tts-1', 'tts-1-hd'] } },
+  transcription: { openai: { label: 'OpenAI 时码识别', baseUrl: 'https://api.openai.com', models: ['whisper-1'] } },
+  lipsync: { sync: { label: 'Sync 口型同步', baseUrl: 'https://api.sync.so', models: ['lipsync-2', 'lipsync-2-pro', 'sync-3'] } },
+  rigging: { meshy: { label: 'Meshy 骨骼绑定', baseUrl: 'https://api.meshy.ai', models: ['rigging'] } },
+  research: { tavily: { label: 'Tavily 联网资料', baseUrl: 'https://api.tavily.com', models: ['search'] } },
+  stock: { pexels: { label: 'Pexels 联网素材', baseUrl: 'https://api.pexels.com', models: ['search'] } },
   text: {
     gemini: { label: 'Gemini 官方', baseUrl: 'https://generativelanguage.googleapis.com', models: ['gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview'] },
     openai: { label: 'OpenAI 官方', baseUrl: 'https://api.openai.com', models: ['deepseek-v4-pro', 'gpt-5.6-terra'] },
@@ -154,6 +160,18 @@ export function AiConfigsPanel() {
   const locale = useUiLocale()
   const { resolvedTheme } = useTheme()
   const queryClient = useQueryClient()
+  const toolCatalog = useQuery(toolboxQueries.catalog())
+  const providerPresets = Object.fromEntries(Object.entries(PROVIDER_PRESETS).map(([type, presets]) => [type, { ...presets }]))
+  for (const preset of toolCatalog.data?.providers ?? []) {
+    providerPresets[preset.serviceType] ??= {}
+    const existing = providerPresets[preset.serviceType][preset.provider]
+    providerPresets[preset.serviceType][preset.provider] = {
+      label: existing?.label ?? preset.name,
+      baseUrl: existing?.baseUrl ?? preset.baseUrl,
+      models: [...new Set([...(existing?.models ?? []), ...preset.models])],
+      requiresApiKey: existing?.requiresApiKey ?? preset.requiresApiKey,
+    }
+  }
 
   const configsQuery = useQuery({
     queryKey: qk.aiConfigs(),
@@ -161,17 +179,39 @@ export function AiConfigsPanel() {
     staleTime: 30_000,
   })
   const cfgs = configsQuery.data ?? []
-  const invalidate = () => void queryClient.invalidateQueries({ queryKey: qk.aiConfigs() })
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: qk.aiConfigs() })
+    void queryClient.invalidateQueries({ predicate: query => query.queryKey.some(key => typeof key === 'string' && key.startsWith('creative')) })
+  }
 
-  const serviceTypes = [
+  const serviceTypes: { type: string; label: string }[] = [
     { type: 'text' as const, label: t('common.serviceType.text') },
     { type: 'image' as const, label: t('common.serviceType.image') },
     { type: 'video' as const, label: t('common.serviceType.video') },
+    { type: 'speech' as const, label: '语音合成' },
+    { type: 'transcription' as const, label: '语音识别' },
+    { type: 'lipsync' as const, label: '口型同步' },
+    { type: 'rigging' as const, label: '骨骼绑定' },
+    { type: 'research' as const, label: '联网资料' },
+    { type: 'stock' as const, label: '联网素材' },
   ]
-  const serviceMeta = {
+  const serviceMeta: Record<string, { label: string; desc: string }> = {
+    speech: { label: '语音合成', desc: '旁白与角色配音；共用模型配置、地址和密钥管理' },
+    transcription: { label: '语音识别', desc: '原声转写与字幕时码' },
+    lipsync: { label: '口型同步', desc: '人物视频或图片与配音对齐；静态图片请选择 sync-3' },
+    rigging: { label: '骨骼绑定', desc: '三维人形模型绑定与动作输出' },
+    research: { label: '联网资料', desc: '搜索主题资料，保留来源链接' },
+    stock: { label: '联网素材', desc: '搜索图片与视频，保留作者和来源' },
     text: { label: t('common.serviceType.text'), desc: t('settings.ai.meta.text') },
     image: { label: t('common.serviceType.image'), desc: t('settings.ai.meta.image') },
     video: { label: t('common.serviceType.video'), desc: t('settings.ai.meta.video') },
+  }
+  const capabilityLabels: Record<string, string> = { music: '音乐与音效', audio: '音频处理', image_edit: '图像编辑', image_editing: '图像编辑', video_edit: '视频处理', video_editing: '视频处理', model: '三维模型生成', model3d: '三维模型生成', model_3d: '三维模型生成', animation: '动画生成', vision: '视觉分析', enhancement: '画质增强', avatar: '数字人', search: '联网搜索', browser: '浏览器与录制', voice: '声音制作', sound: '音效生成', sound_effects: '音效生成', segmentation: '分割与抠图', rendering: '三维渲染' }
+  for (const type of new Set([...(toolCatalog.data?.providers.map(preset => preset.serviceType) ?? []), ...cfgs.map(config => config.serviceType)])) {
+    if (serviceTypes.some(item => item.type === type)) continue
+    const label = capabilityLabels[type] ?? type
+    serviceTypes.push({ type, label })
+    serviceMeta[type] = { label, desc: '短剧、创意视频与制作工具箱共用此能力的服务配置' }
   }
 
   // ===== 火宝快捷配置 =====
@@ -242,7 +282,7 @@ export function AiConfigsPanel() {
       const models = [m, ...c.models.filter((x) => x !== m)]
       const maxPriority = Math.max(0, ...cfgs.filter((x) => x.serviceType === c.serviceType).map((x) => x.priority || 0))
       const payload: Record<string, unknown> = { model: models }
-      if ((c.priority || 0) < maxPriority) payload.priority = maxPriority + 1
+      if (defaultModelOf(c.serviceType)?.configId !== c.id) payload.priority = maxPriority + 1
       if (!c.isActive) payload.is_active = true // 停用配置无法成为默认,选择即启用
       return aiConfigApi.update(c.id, payload)
     },
@@ -274,6 +314,9 @@ export function AiConfigsPanel() {
   const [modelInput, setModelInput] = useState('')
   const [testResult, setTestResult] = useState<ConfigTestResult | null>(null)
   const [testing, setTesting] = useState(false)
+  const [clearKey, setClearKey] = useState(false)
+  const [serviceOptions, setServiceOptions] = useState('')
+  const [serviceOptionsError, setServiceOptionsError] = useState<string | null>(null)
 
   const form = useForm<CfgFormInput, unknown, CfgFormOutput>({
     resolver: zodResolver(CFG_FORM_SCHEMA),
@@ -281,12 +324,12 @@ export function AiConfigsPanel() {
   })
 
   function presetsByType(type: ServiceType) {
-    const group = PROVIDER_PRESETS[type] || {}
+    const group = providerPresets[type] || {}
     return Object.entries(group).map(([provider, preset]) => ({ provider, ...preset }))
   }
 
   function applyProviderPreset(type: ServiceType, provider: string) {
-    const preset = PROVIDER_PRESETS[type]?.[provider]
+    const preset = providerPresets[type]?.[provider]
     if (!preset) return
     form.setValue('provider', provider)
     form.setValue('base_url', preset.baseUrl)
@@ -296,7 +339,10 @@ export function AiConfigsPanel() {
 
   function startAddCfg(type: ServiceType) {
     setEditId(null)
+    setClearKey(false)
     setTestResult(null)
+    setServiceOptions('')
+    setServiceOptionsError(null)
     setDialogType(type)
     form.reset({ name: '', provider: '', priority: 0, api_key: '', base_url: '', temperature: '' })
     setModels([])
@@ -307,13 +353,16 @@ export function AiConfigsPanel() {
 
   function startEditCfg(c: AiConfig) {
     setEditId(c.id)
+    setClearKey(false)
     setTestResult(null)
+    setServiceOptions(c.serviceOptions && Object.keys(c.serviceOptions).length ? JSON.stringify(c.serviceOptions, null, 2) : '')
+    setServiceOptionsError(null)
     setDialogType(c.serviceType)
     form.reset({
       name: c.name || '',
       provider: c.provider,
       priority: c.priority ?? 0,
-      api_key: c.apiKey || '',
+      api_key: '',
       base_url: c.baseUrl || '',
       temperature: c.temperature == null ? '' : String(c.temperature),
     })
@@ -359,7 +408,8 @@ export function AiConfigsPanel() {
     try {
       const result = await aiConfigApi.test(payload)
       setTestResult(result)
-      if (result.reachable) toast.success(t('settings.cfg.reachable'))
+      if (result.checked === 'configuration') toast.info(result.message)
+      else if (result.reachable) toast.success(t('settings.cfg.reachable'))
       else toast.warning(t('settings.cfg.unreachable'))
     } catch (err) {
       toastError(err)
@@ -370,16 +420,38 @@ export function AiConfigsPanel() {
 
   function onTestDraft() {
     const v = form.getValues()
+    let parsedOptions: unknown = {}
+    try {
+      parsedOptions = serviceOptions.trim() ? JSON.parse(serviceOptions) : {}
+      if (!parsedOptions || typeof parsedOptions !== 'object' || Array.isArray(parsedOptions)) throw new Error()
+      setServiceOptionsError(null)
+    } catch {
+      setServiceOptionsError('服务参数的 JSON 格式不正确，请检查后保存。')
+      return
+    }
     void testPayload({
+      config_id: editId,
       service_type: dialogType,
       provider: v.provider,
       api_key: v.api_key,
+      ...(clearKey ? { clear_key: true, is_active: false } : {}),
       base_url: v.base_url,
       model: [...models],
+      service_options: parsedOptions,
     })
   }
 
   function onSave(v: CfgFormOutput) {
+    let parsedOptions: Record<string, unknown> = {}
+    try {
+      const value: unknown = serviceOptions.trim() ? JSON.parse(serviceOptions) : {}
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('服务参数需要填写 JSON 对象')
+      parsedOptions = value as Record<string, unknown>
+      setServiceOptionsError(null)
+    } catch {
+      setServiceOptionsError('服务参数的 JSON 格式不正确，请检查后保存。')
+      return
+    }
     const temperature = v.temperature === '' || v.temperature === null ? null : Number(v.temperature)
     if (temperature !== null && (!Number.isFinite(temperature) || temperature < 0 || temperature > 2)) {
       toast.warning(t('settings.cfg.tempInvalid'))
@@ -389,10 +461,12 @@ export function AiConfigsPanel() {
       name: v.name,
       provider: v.provider,
       api_key: v.api_key,
+      ...(clearKey ? { clear_key: true, is_active: false } : {}),
       base_url: v.base_url,
       model: models,
       priority: v.priority,
       temperature,
+      service_options: parsedOptions,
     }
     void (async () => {
       try {
@@ -416,7 +490,7 @@ export function AiConfigsPanel() {
     <div className={PANEL_SCROLL}>
       <div className={SETTINGS_HEAD}>
         <h2 className={SETTINGS_TITLE}>{t('settings.ai.title')}</h2>
-        <p className={SETTINGS_DESC}>{t('settings.ai.desc')}</p>
+        <p className={SETTINGS_DESC}>短剧与创意视频共用这些模型和服务。每类服务按优先级选用默认配置，也可在制作时指定模型。</p>
       </div>
 
       {/* 火宝快捷配置 */}
@@ -534,8 +608,8 @@ export function AiConfigsPanel() {
                 <div className={CONFIG_MAIN}>
                   <div className={CONFIG_LINE}>
                     <span className={CONFIG_NAME}>{c.name || `${c.provider}-${c.serviceType}`}</span>
-                    <Badge tone={c.apiKey ? 'success' : 'error'}>
-                      {c.apiKey ? t('settings.ai.hasKey') : t('settings.ai.noKey')}
+                    <Badge tone={providerPresets[c.serviceType]?.[c.provider]?.requiresApiKey === false ? 'default' : c.hasApiKey ? 'success' : 'error'}>
+                      {providerPresets[c.serviceType]?.[c.provider]?.requiresApiKey === false ? '无需密钥' : c.hasApiKey ? t('settings.ai.hasKey') : t('settings.ai.noKey')}
                     </Badge>
                     {!c.isActive && <Badge>{t('settings.common.disabled')}</Badge>}
                   </div>
@@ -560,18 +634,18 @@ export function AiConfigsPanel() {
                   <div className={`font-code truncate ${CONFIG_SUB}`}>{c.baseUrl || t('settings.ai.noBaseUrl')}</div>
                 </div>
                 {st.type === 'text' && (
-                  <Button variant="ghost" size="sm" onClick={() => { startEditCfg(c); void testPayload({ service_type: c.serviceType, provider: c.provider, api_key: c.apiKey || '', base_url: c.baseUrl || '', model: c.models }) }}>
+                  <Button variant="ghost" size="sm" onClick={() => { startEditCfg(c); void testPayload({ config_id: c.id, service_type: c.serviceType, provider: c.provider, api_key: '', base_url: c.baseUrl || '', model: c.models }) }}>
                     {t('settings.ai.test')}
                   </Button>
                 )}
                 <label className={CONFIG_SWITCH}>
-                  <input type="checkbox" className="sr-only peer" checked={c.isActive} onChange={() => toggleMutation.mutate(c)} />
+                  <input type="checkbox" aria-label={`启用 ${c.name}`} className="sr-only peer" checked={c.isActive} onChange={() => toggleMutation.mutate(c)} />
                   <Switch checked={c.isActive} className="peer-focus-visible:shadow-focus" />
                 </label>
-                <Button variant="ghost" size="icon" className={ICON_BTN_SM} onClick={() => startEditCfg(c)}>
+                <Button variant="ghost" size="icon" className={ICON_BTN_SM} aria-label={`编辑 ${c.name}`} onClick={() => startEditCfg(c)}>
                   <Pencil size={13} />
                 </Button>
-                <Button variant="danger" size="icon" className={ICON_BTN_SM} onClick={() => delMutation.mutate(c.id)}>
+                <Button variant="danger" size="icon" className={ICON_BTN_SM} aria-label={`删除 ${c.name}`} onClick={() => delMutation.mutate(c.id)}>
                   <Trash2 size={13} />
                 </Button>
               </div>
@@ -596,7 +670,7 @@ export function AiConfigsPanel() {
         showClose={false}
         footer={
           <>
-            <Button variant="ghost" disabled={testing} onClick={onTestDraft}>
+            <Button variant="ghost" disabled={testing || clearKey} onClick={onTestDraft}>
               {testing ? <Loader2 size={12} className="animate-spin" /> : <span>{t('settings.cfg.test')}</span>}
             </Button>
             <Button onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
@@ -606,7 +680,7 @@ export function AiConfigsPanel() {
       >
         <form id="ai-config-form" className={CONFIG_DIALOG_BODY} onSubmit={form.handleSubmit(onSave)}>
           <div className={PRESET_PICKER}>
-            {presetsByType(dialogType).map((preset) => (
+            {presetsByType(dialogType).filter(preset => !editId || preset.provider === form.getValues('provider')).map((preset) => (
               <button
                 key={`${dialogType}-${preset.provider}`}
                 type="button"
@@ -626,7 +700,8 @@ export function AiConfigsPanel() {
             <BaseSelect
               value={form.watch('provider')}
               onChange={(v) => form.setValue('provider', v)}
-              options={PROVIDERS.map((p) => ({ label: p, value: p }))}
+              options={[...new Set([...Object.keys(providerPresets[dialogType] ?? {}), ...(editId ? [form.getValues('provider')] : [])])].map((p) => ({ label: p, value: p }))}
+              disabled={!!editId}
               placeholder={t('settings.cfg.providerPlaceholder')}
               searchable
             />
@@ -638,11 +713,16 @@ export function AiConfigsPanel() {
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-[550] text-content-secondary">API Key</span>
-            <Input {...form.register('api_key')} type="password" placeholder="sk-..." autoComplete="off" />
+            <Input {...form.register('api_key')} type="password" disabled={clearKey} placeholder={providerPresets[dialogType]?.[form.watch('provider')]?.requiresApiKey === false ? '可选，此服务无需密钥' : editId ? '留空保留已保存密钥' : '请输入 API Key'} autoComplete="off" />
+            {providerPresets[dialogType]?.[form.watch('provider')]?.requiresApiKey === false && <span className="text-xs text-content-muted">此服务无需密钥，仍需保存服务地址{form.watch('provider') === 'comfyui' ? '和 API 工作流' : ''}配置。</span>}
           </label>
+          {editId && <label className="flex items-center gap-2 text-xs text-content-muted">
+            <input type="checkbox" checked={clearKey} onChange={event => setClearKey(event.target.checked)} />
+            清除已保存密钥并停用此配置
+          </label>}
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-[550] text-content-secondary">Base URL</span>
-            <Input {...form.register('base_url')} placeholder="https://..." />
+            <Input {...form.register('base_url')} placeholder="https://..." readOnly={['lipsync', 'rigging', 'research', 'stock'].includes(dialogType)} />
           </label>
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-[550] text-content-secondary">{t('settings.cfg.models')}</span>
@@ -679,6 +759,7 @@ export function AiConfigsPanel() {
                 className="flex-1"
                 placeholder={t('settings.cfg.modelPlaceholder')}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
                   if (e.key === 'Enter') {
                     e.preventDefault()
                     addModel()
@@ -692,6 +773,12 @@ export function AiConfigsPanel() {
             </div>
             <span className="text-micro leading-[1.5] text-content-subtle">{t('settings.cfg.modelsHint')}</span>
           </div>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-[550] text-content-secondary">服务参数（JSON）</span>
+            <Textarea aria-label="服务参数（JSON）" value={serviceOptions} onChange={event => { setServiceOptions(event.target.value); setServiceOptionsError(null) }} rows={form.watch('provider') === 'comfyui' ? 8 : 3} resize="vertical" className="font-mono text-xs" placeholder={form.watch('provider') === 'comfyui' ? '{"workflow_json": {}, "prompt_node": "6", "image_node": "10"}' : '{}'} spellCheck={false} />
+            <span className="text-micro leading-relaxed text-content-subtle">{form.watch('provider') === 'comfyui' ? '填入 ComfyUI 的 API 格式工作流 workflow_json，并指定需要替换输入的 prompt_node、image_node 等节点编号。制作时使用此工作流，已有配置会保留并恢复这些参数。' : '可选。填写服务所需的专用参数；留空表示使用默认参数。'}</span>
+          </label>
+          {serviceOptionsError && <p role="alert" className="text-xs text-danger">{serviceOptionsError}</p>}
           {dialogType === 'text' && (
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-[550] text-content-secondary">
@@ -702,9 +789,9 @@ export function AiConfigsPanel() {
             </label>
           )}
           {testResult && (
-            <div className={cn(TEST_RESULT_BASE, testResult.reachable ? TEST_RESULT_OK : TEST_RESULT_BAD)}>
+            <div className={cn(TEST_RESULT_BASE, testResult.checked === 'configuration' ? 'border-outline bg-elevated' : testResult.reachable ? TEST_RESULT_OK : TEST_RESULT_BAD)}>
               <div className={TEST_RESULT_HEAD}>
-                <Badge tone={testResult.reachable ? 'success' : 'error'}>{testResult.status || 'ERROR'}</Badge>
+                <Badge tone={testResult.checked === 'configuration' ? 'brand' : testResult.reachable ? 'success' : 'error'}>{testResult.checked === 'configuration' ? '配置检查' : testResult.status || 'ERROR'}</Badge>
                 <span>{testResult.message}</span>
               </div>
               <div className={TEST_RESULT_META}>{testResult.method} {testResult.url}</div>

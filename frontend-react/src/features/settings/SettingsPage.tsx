@@ -1,5 +1,5 @@
 /**
- * 设置页壳（旧 pages/settings.vue）：左侧导航 + 右侧面板。
+ * 设置页壳：左侧导航 + 右侧面板。
  * 各面板独立挂载（切到对应 tab 才请求数据）；内容语言由 agents 面板经共享缓存读取。
  */
 import { useEffect, useState } from 'react'
@@ -39,7 +39,7 @@ export function SettingsPage() {
   const [tab, setTab] = useState<TabId>('ai')
 
   const baseTabs: { id: TabId; label: string; icon: typeof Cpu }[] = [
-    { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
+    { id: 'ai', label: '模型与服务', icon: Cpu },
     { id: 'general', label: t('settings.tabs.general'), icon: Languages },
     { id: 'styles', label: t('settings.tabs.styles'), icon: Palette },
     { id: 'agents', label: t('settings.tabs.agents'), icon: Bot },

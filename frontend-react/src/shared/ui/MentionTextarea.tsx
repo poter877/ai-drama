@@ -165,7 +165,9 @@ export function MentionTextarea({
   // 下拉 Portal 到 body 后用 fixed 定位，任何外层滚动/窗口变化都会使其错位 → 直接关闭
   useEffect(() => {
     const closeOnOuterScroll = (e: Event) => {
-      if (e.target !== taRef.current) setMention((s) => (s.open ? CLOSED : s))
+      // 候选列表自身的滚动（含键盘导航的 scrollIntoView）不改变锚点位置。
+      if (e.target === taRef.current || (e.target instanceof Node && dropdownRef.current?.contains(e.target))) return
+      setMention((s) => (s.open ? CLOSED : s))
     }
     window.addEventListener('scroll', closeOnOuterScroll, true)
     window.addEventListener('resize', closeOnOuterScroll)

@@ -4,7 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/shared/lib/cn'
 
 const fieldBase =
-  'w-full rounded-control border border-outline-strong bg-input text-content text-form tracking-[-0.01em] ' +
+  'w-full rounded-control border border-outline-strong bg-input font-ui text-content text-form tracking-[-0.01em] ' +
   'outline-none transition-[border-color,box-shadow,background] duration-150 ease-app ' +
   'placeholder:text-content-subtle ' +
   'hover:border-outline-hover ' +

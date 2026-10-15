@@ -3,6 +3,14 @@
  * Preflight 在独立验收批次后才启用，届时删除与此重复的 reset。
  */
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 html,
 body,
 #root {

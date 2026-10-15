@@ -136,7 +136,7 @@ app.post('/', async (c) => {
 
     if (type === 'video' && videoBody) {
       const effectiveConfig = configId
-        ? (await getConfigById(configId)) ?? await getActiveConfig('video')
+        ? (await getConfigById(configId, 'video')) ?? await getActiveConfig('video')
         : await getActiveConfig('video')
       const validationError = validateVideoRequest(videoBody, effectiveConfig?.provider)
       if (validationError) return badRequest(c, validationError)

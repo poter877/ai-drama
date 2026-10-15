@@ -1,5 +1,5 @@
 appId: com.huobao.drama
-productName: HuobaoDrama
+productName: 视频工厂
 directories:
   output: release
   buildResources: build
@@ -16,6 +16,7 @@ asarUnpack:
   - "**/node_modules/@img/**"
   - "**/node_modules/better-sqlite3/**"
 extraResources:
+  - { from: ../LICENSE, to: LICENSE }
   - { from: resources/frontend, to: frontend }
   - { from: resources/workspace-template, to: workspace-template }
   # ${os} 宏：darwin → bin-darwin/（无扩展名二进制），win32 → bin-win32/（.exe），
@@ -57,4 +58,4 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
-  shortcutName: HuobaoDrama
+  shortcutName: 视频工厂

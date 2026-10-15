@@ -7,9 +7,29 @@
 import type Database from 'better-sqlite3'
 
 export const sqliteSchemaStatements = [
+  `CREATE TABLE IF NOT EXISTS production_tool_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL REFERENCES dramas(id),
+    tool_id TEXT NOT NULL, fingerprint TEXT NOT NULL, revision INTEGER NOT NULL, input TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'queued', progress INTEGER NOT NULL DEFAULT 0,
+    result TEXT NOT NULL DEFAULT '{}', error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_production_tools_lookup ON production_tool_jobs(project_id, tool_id, fingerprint)`,
+  `CREATE TABLE IF NOT EXISTS creative_tool_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL REFERENCES dramas(id),
+    kind TEXT NOT NULL, fingerprint TEXT NOT NULL, revision INTEGER NOT NULL, input TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued', remote_id TEXT, progress INTEGER NOT NULL DEFAULT 0,
+    result TEXT NOT NULL DEFAULT '{}', error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_creative_tool_job_lookup ON creative_tool_jobs(project_id, kind, fingerprint)`,
+  `CREATE TABLE IF NOT EXISTS creative_models (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL REFERENCES dramas(id),
+    name TEXT NOT NULL, url TEXT NOT NULL, metadata TEXT NOT NULL, created_at TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS dramas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
+    project_type TEXT NOT NULL DEFAULT 'drama',
+    creative_category TEXT,
     description TEXT,
     genre TEXT,
     style TEXT DEFAULT '3d',
@@ -294,6 +314,65 @@ export const sqliteSchemaStatements = [
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
+
+  `CREATE TABLE IF NOT EXISTS creative_pipeline_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL REFERENCES dramas(id),
+    definition TEXT NOT NULL, snapshot TEXT NOT NULL, revision INTEGER NOT NULL, version INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'ready', cursor INTEGER NOT NULL DEFAULT 0, stages TEXT NOT NULL,
+    error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project ON creative_pipeline_runs(project_id, id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_active_project ON creative_pipeline_runs(project_id)
+    WHERE status NOT IN ('completed', 'cancelled')`,
+  `CREATE TABLE IF NOT EXISTS creative_pipeline_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL REFERENCES creative_pipeline_runs(id),
+    stage_id TEXT, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_pipeline_events_run ON creative_pipeline_events(run_id, id)`,
+  `CREATE TABLE IF NOT EXISTS creative_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    actions TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'completed',
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_creative_messages_project ON creative_messages(project_id, id)`,
+  `CREATE TABLE IF NOT EXISTS creative_projects (
+    project_id INTEGER PRIMARY KEY REFERENCES dramas(id),
+    revision INTEGER NOT NULL DEFAULT 1,
+    approved_revision INTEGER,
+    document TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS creative_shot_tasks (
+    project_id INTEGER NOT NULL REFERENCES dramas(id),
+    shot_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('image', 'video')),
+    fingerprint TEXT NOT NULL,
+    task_id INTEGER NOT NULL REFERENCES sys_task(id),
+    PRIMARY KEY(project_id, shot_id, kind)
+  )`,
+  `CREATE TABLE IF NOT EXISTS creative_renders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES dramas(id),
+    revision INTEGER NOT NULL,
+    snapshot TEXT NOT NULL,
+    outputs TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'pending',
+    progress INTEGER NOT NULL DEFAULT 0,
+    video_url TEXT,
+    subtitle_url TEXT,
+    duration REAL,
+    error_msg TEXT,
+    warnings TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_creative_renders_project ON creative_renders(project_id, id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_creative_render_active ON creative_renders(project_id)
+    WHERE status IN ('pending', 'processing')`,
 ]
 
 /**
@@ -378,6 +457,20 @@ export function initSqliteSchema(sqlite: Database.Database) {
   for (const statement of sqliteSchemaStatements) {
     sqlite.exec(statement)
   }
+  // Existing SQLite databases keep their data and acquire the project discriminator once.
+  const pipelineColumns = new Set((sqlite.prepare('PRAGMA table_info(creative_pipeline_runs)').all() as { name: string }[]).map(c => c.name))
+  if (!pipelineColumns.has('snapshot')) sqlite.exec("ALTER TABLE creative_pipeline_runs ADD COLUMN snapshot TEXT NOT NULL DEFAULT '{}'")
+  const renderColumns = new Set((sqlite.prepare('PRAGMA table_info(creative_renders)').all() as { name: string }[]).map(c => c.name))
+  if (!renderColumns.has('outputs')) sqlite.exec("ALTER TABLE creative_renders ADD COLUMN outputs TEXT NOT NULL DEFAULT '[]'")
+  const dramaColumns = new Set((sqlite.prepare('PRAGMA table_info(dramas)').all() as { name: string }[]).map(c => c.name))
+  if (!dramaColumns.has('project_type')) sqlite.exec("ALTER TABLE dramas ADD COLUMN project_type TEXT NOT NULL DEFAULT 'drama'")
+  if (!dramaColumns.has('creative_category')) sqlite.exec('ALTER TABLE dramas ADD COLUMN creative_category TEXT')
+  sqlite.exec(`CREATE TRIGGER IF NOT EXISTS creative_no_episode_insert
+    BEFORE INSERT ON episodes WHEN (SELECT project_type FROM dramas WHERE id = NEW.drama_id) = 'creative'
+    BEGIN SELECT RAISE(ABORT, '创意视频项目不使用剧集'); END`)
+  sqlite.exec(`CREATE TRIGGER IF NOT EXISTS creative_no_episode_move
+    BEFORE UPDATE OF drama_id ON episodes WHEN (SELECT project_type FROM dramas WHERE id = NEW.drama_id) = 'creative'
+    BEGIN SELECT RAISE(ABORT, '创意视频项目不使用剧集'); END`)
   const insertSeed = sqlite.prepare(SEED_SQL)
   const upgradeSeed = sqlite.prepare(UPGRADE_SQL)
   const removeSeed = sqlite.prepare(REMOVE_SQL)

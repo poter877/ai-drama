@@ -1,12 +1,12 @@
-# 🎬 Huobao Drama - AI Short Drama Generation Platform
+# 🎬 Video Factory - AI Short Drama Generation Platform
 
 <div align="center">
 
 **A full-stack TypeScript platform for automated AI short-drama production**
 
-[![Node Version](https://img.shields.io/badge/Node.js-20+-339933?style=flat&logo=node.js)](https://nodejs.org)
-[![Vue Version](https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat&logo=vue.js)](https://vuejs.org)
-[![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+[![Node Version](https://img.shields.io/badge/Node.js-22.12+-339933?style=flat&logo=node.js)](https://nodejs.org)
+[![React Version](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react)](https://react.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Download](https://img.shields.io/github/v/release/chatfire-AI/huobao-drama?style=flat&logo=github&label=Download)](https://github.com/chatfire-AI/huobao-drama/releases/latest)
 
 **English** | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
@@ -19,7 +19,7 @@
 
 After deploying, paste the key in "Settings → Huobao Quick Setup" to write three recommended configs in one click
 
-<h3>📥 <a href="https://github.com/chatfire-AI/huobao-drama/releases/latest">Download Desktop App (macOS / Windows)</a></h3>
+<h3>📥 <a href="https://github.com/chatfire-AI/huobao-drama/releases/latest">Upstream Desktop Releases (macOS / Windows)</a></h3>
 <h3>🌐 <a href="https://www.chatfire.site">Official Website</a></h3>
 
 </div>
@@ -28,7 +28,7 @@ After deploying, paste the key in "Settings → Huobao Quick Setup" to write thr
 
 ## 📖 Overview
 
-Huobao Drama is an AI-powered short-drama production platform that automates the entire pipeline: script generation, character design, storyboard breakdown, and video compositing.
+Video Factory is an AI-powered short-drama production platform that automates the entire pipeline: script generation, character design, storyboard breakdown, and video compositing.
 
 ### 🎯 Core Value
 
@@ -40,7 +40,7 @@ Huobao Drama is an AI-powered short-drama production platform that automates the
 ### 🛠️ Architecture
 
 ```
-frontend/   — Nuxt 3 + Vue 3 + TypeScript (pure CSS, no UI framework)
+frontend-react/ — React 19 + TypeScript + Vite 7 + Tailwind CSS v4
 backend/    — Hono + Drizzle ORM + Mastra AI Agents + better-sqlite3
 backend/workspace/skills/ — Agent skill definitions (SKILL.md, editable in the UI)
 desktop/    — Electron desktop app (main process + esbuild + electron-builder dmg/exe)
@@ -106,7 +106,7 @@ The interface ships in **中文 / English / 日本語 / 한국어**, with a glob
 
 | Software | Version | Notes |
 |---|---|---|
-| **Node.js** | 20+ | Runtime for frontend and backend |
+| **Node.js** | 22.12+ | Runtime for frontend and backend |
 | **npm** | 9+ | Package manager |
 
 > **Zero-install database**: Bundled SQLite (single file in the project data directory) — no database server required.
@@ -123,7 +123,7 @@ No config files — everything is set via environment variables (all have defaul
 | `STORAGE_PATH` | `<repo>/data/static` | Generated-file storage directory |
 | `HUOBAO_DATA_DIR` | — | Injected by the Electron main process (userData data root) |
 | `WORKSPACE_PATH` | `backend/workspace` | Agent skills/prompts directory (desktop: writable copy under userData) |
-| `FRONTEND_DIST` | `frontend/dist` | Frontend static build directory |
+| `FRONTEND_DIST` | `frontend-react/dist` | Frontend static build directory |
 | `FFMPEG_BIN` / `FFPROBE_BIN` | bundled npm binaries | Custom ffmpeg/ffprobe executable paths |
 | `PUBLIC_BASE_URL` | — | Public URL Seedance needs to reference local assets (server deployments) |
 
@@ -140,7 +140,7 @@ cd huobao-drama
 cd backend && npm install
 
 # Install frontend dependencies
-cd ../frontend && npm install
+cd ../frontend-react && npm install
 ```
 
 ### 🎯 Running
@@ -155,11 +155,11 @@ cd backend
 npm run dev
 
 # Terminal 2: frontend
-cd frontend
+cd frontend-react
 npm run dev
 ```
 
-- Frontend: `http://localhost:3013`
+- Frontend: `http://localhost:3014`
 - Backend API: `http://localhost:5679/api/v1`
 - The frontend automatically proxies `/api` and `/static` to the backend
 
@@ -168,15 +168,11 @@ npm run dev
 The backend serves both the API and the frontend static files:
 
 ```bash
-# 1. Build the frontend
-cd frontend && npm run generate
+# 1. Build the React frontend
+npm run build:frontend
 
-# 2. Copy the build output where the backend expects it
-#    (generate outputs to .output/public; the backend reads frontend/dist)
-cp -r .output/public dist
-
-# 3. Start the backend
-cd ../backend && npm start
+# 2. Start the backend (serves frontend-react/dist automatically)
+npm --prefix backend start
 ```
 
 Visit: `http://localhost:5679`
@@ -284,6 +280,8 @@ The episode list shows the production status of every episode — click "Enter S
 
 ### 🖥️ Desktop App (recommended)
 
+> The download links below point to upstream Huobao Drama releases. To build Video Factory with the current name and MIT license, use the source packaging commands below. The desktop app keeps the existing `HuobaoDrama` data directory so existing projects and settings remain available.
+
 **⬇️ Prebuilt installers: [GitHub Releases](https://github.com/chatfire-AI/huobao-drama/releases/latest) · [Mirror for China (Tencent COS)](https://installer.chatfire.site/huobao-drama/v4.0.5/)**
 
 | Platform | File to download |
@@ -308,21 +306,21 @@ No build required — download the dmg/exe and install. Installed clients auto-u
 Double-click to install, works out of the box (macOS + Windows): the SQLite database, generated media, and Agent skills all live in the user-data directory — uninstalling the app does not affect your data.
 
 ```bash
-# One-command packaging (frontend generate → backend esbuild → electron-builder)
+# One-command packaging (frontend Vite build → backend esbuild → electron-builder)
 npm run dist        # macOS dmg (arm64 + Intel)
 npm run dist:win    # Windows NSIS installer (win-x64, cross-buildable on macOS)
 
 # Artifacts
-# desktop/release/HuobaoDrama-<version>-arm64.dmg     (Apple Silicon)
-# desktop/release/HuobaoDrama-<version>.dmg           (Intel)
-# desktop/release/HuobaoDrama Setup <version>.exe     (Windows)
+# desktop/release/视频工厂-<version>-arm64.dmg     (Apple Silicon)
+# desktop/release/视频工厂-<version>.dmg           (Intel)
+# desktop/release/视频工厂 Setup <version>.exe     (Windows)
 ```
 
 Installation notes:
 
 - The macOS build is unsigned — on first launch you may see "App is damaged and can't be opened" (common on Apple Silicon). This is Gatekeeper's quarantine attribute, not actual file damage. Two ways to fix it:
   1. **The dmg bundles a fix script**: after dragging the app into Applications, double-click the "如提示已损坏请双击我.command" script at the bottom of the dmg window — it removes the quarantine attribute automatically;
-  2. Or run `sudo xattr -cr /Applications/HuobaoDrama.app` in Terminal.
+  2. Or run `sudo xattr -cr /Applications/视频工厂.app` in Terminal.
 
   The fix is one-time only — the app then launches normally, and in-app auto-updates are not affected.
 - The Windows build is unsigned — SmartScreen will prompt "More info → Run anyway"
@@ -351,8 +349,7 @@ Installed clients check the manifest automatically after launch (manual check av
 Desktop development:
 
 ```bash
-npm run build:frontend   # frontend static output (frontend/.output/public)
-cd desktop && npm run dev  # bundle the backend and run in an Electron window
+npm run dev:desktop
 ```
 
 > Known limitation: Seedance video models need a `PUBLIC_BASE_URL` public address to reference local assets; the desktop app has no public entry point, so that scenario produces a clear error message. Text-to-video, image generation, and all other capabilities are unaffected.
@@ -362,15 +359,11 @@ cd desktop && npm run dev  # bundle the backend and run in an Electron window
 ### 🏭 Server Deployment
 
 ```bash
-# 1. Build the frontend
-cd frontend && npm run generate
+# 1. Build the React frontend
+npm run build:frontend
 
-# 2. Copy the build output (generate outputs to frontend/.output/public; the backend reads
-#    frontend/dist — skip this step and the API works but pages 404)
-cp -r .output/public dist && cd ..
-
-# 3. Start the backend
-cd backend && npm start
+# 2. Start the backend (serves frontend-react/dist automatically)
+npm --prefix backend start
 ```
 
 Files to upload to the server:
@@ -378,7 +371,7 @@ Files to upload to the server:
 ```
 backend/                    # backend source + node_modules
 backend/workspace/skills/   # Agent skill files
-frontend/dist/              # frontend build output
+frontend-react/dist/              # frontend build output
 data/                       # data directory (auto-created on first run)
 ```
 
@@ -414,37 +407,19 @@ server {
 
 > Media loading optimization: the backend automatically generates 400px thumbnails (`*_thumb.webp`) for list pages and extracts poster frames (`*_poster.jpg`) as video covers — the frontend only loads original files when opening the full image or playing. To backfill historical files, run `npm run backfill-artwork` under `backend/`.
 
-### 🐳 Docker Deployment (with in-app updates)
+### 🐳 Docker Deployment (React source build)
 
-**Option A — prebuilt image (no clone, no build):** multi-arch (`linux/amd64` + `linux/arm64`), x86 servers and ARM devices match automatically
-
-```bash
-docker pull huobao/huobao-drama:4.0.6
-
-docker run -d \
-  --name huobao-drama \
-  -p 5679:5679 \
-  -v huobao-data:/app/data \
-  --restart unless-stopped \
-  huobao/huobao-drama:4.0.6
-```
-
-**Option B — docker compose (source build + Watchtower in-app updates):** the repo root provides an all-in-one `Dockerfile` (three stages: frontend generate + backend dependencies + runtime; the backend runs via tsx just like server deployment) and `docker-compose.yml` (app + Watchtower):
+The default image `video-factory:local` is built from the current source. Compose uses `pull_policy: build`; the React frontend is built inside the image.
 
 ```bash
-# 1. Configure the environment (Watchtower token — must match on the app and watchtower sides)
-cp .env.example .env   # edit WATCHTOWER_TOKEN
-
-# 2. Build and start (inject a version at publish time for "About & Updates" comparison)
-HUOBAO_VERSION=4.0.5 docker compose up -d --build
-
-# 3. Visit http://localhost:5679
+cp .env.example .env
+docker compose up -d --build
+# Open http://localhost:5679
 ```
 
-- **Data persistence**: the named volume `huobao-data` mounts `/app/data` (SQLite + generated images/videos + workspace/skills) — image updates don't lose data
-- **In-app updates**: the compose file ships a [Watchtower](https://containrrr.dev/watchtower/) sidecar (`--label-enable` only updates labeled containers, `--cleanup` removes old images, daily self-check). "Settings → About & Updates" can check for new versions and "Update Now" — the backend triggers it via the Watchtower HTTP API, which pulls the new image and rebuilds the container; refresh the page after a few minutes
-- **Manual mode**: remove the app's two `HUOBAO_WATCHTOWER_*` env vars (or the whole watchtower service) from `docker-compose.yml` — "About & Updates" then degrades to a new-version notice + manual `docker compose pull && docker compose up -d`
-- **Publishing images**: `docker buildx build --platform linux/amd64,linux/arm64 --build-arg HUOBAO_VERSION=x.y.z -t huobao/huobao-drama:x.y.z -t huobao/huobao-drama:latest --push .` — the version manifest is shared with the desktop app via `latest.json` on GitHub Releases (overridable with `HUOBAO_UPDATE_FEED`)
+The existing `huobao-data` volume keeps the database, media and workspace files. To update, update this checkout and run `docker compose up -d --build` again.
+
+Optional image updates: publish your own React image, set `VIDEO_FACTORY_IMAGE` to that image and `HUOBAO_WATCHTOWER_URL=http://watchtower:8080`, change `WATCHTOWER_TOKEN`, and start with `docker compose --profile auto-update up -d --build`. Set `HUOBAO_UPDATE_FEED` to your release manifest when using a separate release channel. Watchtower is inactive in the default source build setup.
 
 ---
 
@@ -466,12 +441,14 @@ HUOBAO_VERSION=4.0.5 docker compose up -d --build
 
 ### Frontend
 
-- **Framework**: Nuxt 3 (SPA mode)
-- **Language**: Vue 3 + TypeScript
-- **Routing**: File-based routing (Vue Router 4)
-- **Styling**: Pure CSS + CSS Variables
-- **Icons**: Lucide Vue
-- **i18n**: vue-i18n (中文 / English / 日本語 / 한국어)
+- **Framework**: React 19 + Vite 7 (SPA)
+- **Language**: TypeScript (strict)
+- **Routing**: React Router 7
+- **Server state**: TanStack Query v5
+- **Client state**: Zustand v5
+- **Styling**: Tailwind CSS v4 + design tokens
+- **Icons**: Lucide React
+- **i18n**: i18next + react-i18next (中文 / English / 日本語 / 한국어)
 
 ---
 
@@ -495,7 +472,7 @@ A: That's the normal first-deploy guidance. Go to "Settings" and use "Huobao Qui
 
 ### Q: The frontend can't reach the backend API?
 
-A: Check that the backend is running and the port is correct. In dev mode the proxy config lives in `frontend/nuxt.config.ts`.
+A: Check that the backend is running and the port is correct. In dev mode the proxy config lives in `frontend-react/vite.config.ts`.
 
 ### Q: Database tables not created?
 
@@ -589,13 +566,11 @@ A: The backend creates all tables automatically on first launch — check the lo
 
 ## 📄 License
 
-This project is licensed under **[CC BY-NC-SA 4.0](LICENSE)** (Attribution-NonCommercial-ShareAlike 4.0 International).
+This project is licensed under the **[MIT License](LICENSE)**.
 
-- ✅ Personal use, learning, and non-commercial projects are welcome
-- ✅ Modifications and redistribution allowed under the same license with attribution
-- ❌ **Commercial use is prohibited** — you may not use this project, in whole or in part, for any commercial purpose (including paid services, commercial deployments, or resale) without prior written permission from the author
+You may use, copy, modify, distribute, sublicense, and sell copies of the software, including for commercial use. Copies or substantial portions must retain the copyright and license notice. The software is provided "AS IS", without warranty.
 
-Full license text: see [LICENSE](LICENSE).
+See [LICENSE](LICENSE) for the full text.
 
 ---
 
@@ -613,7 +588,7 @@ Common checks:
 
 ```bash
 cd backend && npm run typecheck
-cd ../frontend && npm run build
+cd ../frontend-react && npm run build
 ```
 
 ---

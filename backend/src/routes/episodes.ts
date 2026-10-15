@@ -13,6 +13,12 @@ const app = new Hono()
 app.post('/', async (c) => {
   const body = await c.req.json()
   if (!body.drama_id) return badRequest(c, 'drama_id 必填')
+  const dramaId = Number(body.drama_id)
+  if (!Number.isSafeInteger(dramaId) || dramaId <= 0) return badRequest(c, '项目 ID 无效')
+  const [project] = await db.select().from(schema.dramas)
+    .where(and(eq(schema.dramas.id, dramaId), isNull(schema.dramas.deletedAt)))
+  if (!project) return notFound(c, '项目不存在')
+  if (project.projectType === 'creative') return badRequest(c, '创意视频请在创意视频工作台制作，无需创建剧集')
 
   // 图片/视频配置：显式传入优先，缺省时自动锁定当前启用的最高优先级官方配置
   const imageConfigId = body.image_config_id ?? await getActiveConfigId('image')

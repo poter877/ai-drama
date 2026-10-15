@@ -3,8 +3,12 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 
-// 与旧前端一致：/api、/static 代理到本地 Hono 后端（5679），保持同源请求语义。
-// 新前端开发端口 3014，与旧 Vue（3013）并行；后端 CORS 白名单无需变更（代理后同源）。
+// 开发与预览均将 API 和媒体请求代理到 Hono，保持与生产部署相同的请求路径。
+const backendProxy = {
+  '/api': { target: 'http://localhost:5679', changeOrigin: true },
+  '/static': { target: 'http://localhost:5679', changeOrigin: true },
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -13,10 +17,14 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: {
-      '/api': { target: 'http://localhost:5679', changeOrigin: true },
-      '/static': { target: 'http://localhost:5679', changeOrigin: true },
-    },
+    port: 3014,
+    strictPort: true,
+    proxy: backendProxy,
+  },
+  preview: {
+    port: 3014,
+    strictPort: true,
+    proxy: backendProxy,
   },
   build: {
     outDir: 'dist',

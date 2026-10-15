@@ -1,5 +1,5 @@
 /**
- * 工作台数据与动作编排（旧 episode.vue script 的 React 化）。
+ * 工作台数据查询、状态与动作编排。
  *
  * 关键架构决定（对照重构文档）：
  * - 服务端数据全部由 React Query 持有：项目详情（定位 episodeId）、单集资产/分镜、
@@ -348,11 +348,14 @@ export function WorkbenchProvider({
   const lastRemoteRawRef = useRef<string | null>(null)
   const lastRemoteScriptRef = useRef<string | null>(null)
   useEffect(() => {
-    setRawDraft((prev) => (lastRemoteRawRef.current === null || prev === lastRemoteRawRef.current ? remoteRaw : prev))
+    // 状态更新可能延后执行，先固定本次比较的基线，再推进远端快照。
+    const previousRemote = lastRemoteRawRef.current
+    setRawDraft((prev) => (previousRemote === null || prev === previousRemote ? remoteRaw : prev))
     lastRemoteRawRef.current = remoteRaw
   }, [remoteRaw])
   useEffect(() => {
-    setScriptDraft((prev) => (lastRemoteScriptRef.current === null || prev === lastRemoteScriptRef.current ? remoteScript : prev))
+    const previousRemote = lastRemoteScriptRef.current
+    setScriptDraft((prev) => (previousRemote === null || prev === previousRemote ? remoteScript : prev))
     lastRemoteScriptRef.current = remoteScript
   }, [remoteScript])
 

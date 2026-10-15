@@ -8,8 +8,11 @@ import { getActiveConfig, getConfigById } from './ai.js'
 import { now } from '../utils/response.js'
 import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
-import { getImageAdapter, getVideoAdapter } from './adapters/registry'
-import type { AIConfig } from './adapters/types'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { STORAGE_ROOT } from '../utils/paths.js'
+import { getImageAdapter, getVideoAdapter, imageAdapters, videoAdapters } from './adapters/registry'
+import type { AIConfig } from './ai.js'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 
 type TaskType = 'image' | 'video'
@@ -63,7 +66,7 @@ interface GenerateVideoParams {
 export async function generateImage(params: GenerateImageParams): Promise<number> {
   // 指定配置（集锁定）可能已停用/删除/厂商收敛，失效时回退到当前启用配置，避免生成被旧引用卡死
   const config = params.configId
-    ? (await getConfigById(params.configId)) ?? await getActiveConfig('image')
+    ? (await getConfigById(params.configId, 'image')) ?? await getActiveConfig('image')
     : await getActiveConfig('image')
   if (!config) throw new Error('未配置图片模型，请先到「设置」页添加并启用 AI 服务')
 
@@ -101,7 +104,7 @@ export async function generateImage(params: GenerateImageParams): Promise<number
 export async function generateVideo(params: GenerateVideoParams): Promise<number> {
   // 指定配置（集锁定）可能已停用/删除/厂商收敛，失效时回退到当前启用配置
   const config = params.configId
-    ? (await getConfigById(params.configId)) ?? await getActiveConfig('video')
+    ? (await getConfigById(params.configId, 'video')) ?? await getActiveConfig('video')
     : await getActiveConfig('video')
   if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
 
@@ -165,7 +168,7 @@ async function createTask(
     type,
     ...fields,
     provider: config.provider,
-    params: JSON.stringify(params),
+    params: JSON.stringify({...params, snapshotConfigId:config.id}),
     status: 'processing',
     createdAt: ts,
     updatedAt: ts,
@@ -202,6 +205,11 @@ async function processTask(id: number, config: AIConfig) {
       sceneId: record.sceneId,
       characterId: record.characterId,
     })
+
+    if (!(type === 'image' ? imageAdapters[config.provider] : videoAdapters[config.provider])) {
+      await processExtendedProviderTask(record, config)
+      return
+    }
 
     let url: string, method: string, headers: Record<string, string>, body: unknown
 
@@ -410,8 +418,8 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
   await failTask(record.id, 'Timeout: polling attempts exhausted')
 }
 
-async function handleImageComplete(record: SysTaskRecord, imageUrl: string) {
-  const localPath = await downloadFile(imageUrl, 'images')
+async function handleImageComplete(record: SysTaskRecord, imageUrl: string, existingLocalPath?: string) {
+  const localPath = existingLocalPath || await downloadFile(imageUrl, 'images')
   // 列表页缩略图（前端按命名约定推导地址，失败不影响主流程）
   await generateImageThumb(localPath)
 
@@ -458,8 +466,8 @@ async function writeBackImageAssets(record: SysTaskRecord, localPath: string) {
   }
 }
 
-async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, duration: number | null | undefined) {
-  const localPath = await downloadFile(videoUrl, 'videos')
+async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, duration: number | null | undefined, existingLocalPath?: string) {
+  const localPath = existingLocalPath || await downloadFile(videoUrl, 'videos')
   // 海报帧供列表/封面展示，避免前端为显示首帧缓冲整个视频
   await extractVideoPoster(localPath)
   await db.update(schema.sysTask)
@@ -582,4 +590,41 @@ function normalizeStoredVideoResolution(resolution: string | null | undefined): 
   if (value === '480p' || value === '720p' || value === '1080p') return value
   if (value === '2k') return '2K'
   return undefined
+}
+
+/** Extra providers use the same durable task and asset write-back as the original adapters. */
+async function processExtendedProviderTask(record: SysTaskRecord, config: AIConfig) {
+  const { providerToolSpecs, runProviderTool } = await import('./production-tools/providers.js')
+  const kind = record.type as 'image'|'video'
+  const model = record.model || config.model
+  const entry = Object.entries(providerToolSpecs).find(([,spec]) => spec.provider === config.provider && spec.serviceType === kind && spec.model === model)
+  if (!entry) throw new Error('当前模型没有对应的生成接口，请选择工具库提供的模型或检查服务参数')
+  const params = parseTaskParams(record.params)
+  const folder = path.join(STORAGE_ROOT,'production',String(record.id))
+  await fs.mkdir(folder,{recursive:true})
+  const state = params.providerState && typeof params.providerState === 'object' ? params.providerState : {}
+  const context = { projectId:record.dramaId || 0,toolId:entry[0],args:{...config.serviceOptions,...params,prompt:record.prompt || '',image_url:params.firstFrameUrl || params.imageUrl || params.referenceImages?.[0],aspect_ratio:params.aspectRatio},outputDir:folder,config:{...config,model},state,
+    signal:AbortSignal.timeout(6*60*60*1000),progress:(_value:number)=>{},
+    checkpoint:(value:Record<string,unknown>)=>{ Object.assign(state,value);db.update(schema.sysTask).set({params:JSON.stringify({...params,providerState:state}),taskId:typeof state.remoteId==='string'?state.remoteId:undefined,updatedAt:now()}).where(eq(schema.sysTask.id,record.id)).run() }
+  }
+  const result = await runProviderTool(context)
+  const file = result.files.find(file=>file.kind===kind)
+  if(!file)throw new Error('模型没有返回所需类型的媒体')
+  const root=await fs.realpath(folder),real=await fs.realpath(file.path)
+  if(!real.startsWith(root+path.sep))throw new Error('生成文件超出任务目录')
+  const localPath='static/'+path.relative(await fs.realpath(STORAGE_ROOT),real).split(path.sep).join('/')
+  if(kind==='image')await handleImageComplete(record,'/'+localPath,localPath)
+  else await handleVideoComplete(record,'/'+localPath,params.duration,localPath)
+}
+
+/** Resume known remote work without another generation POST. */
+export async function resumeGenerationTask(id:number) {
+  const record=db.select().from(schema.sysTask).where(eq(schema.sysTask.id,id)).get()
+  if(!record||record.status==='completed'||record.status==='processing')return
+  if(!record.taskId)throw new Error('原生成任务没有服务商编号，需核对原请求后明确重新提交')
+  const params=parseTaskParams(record.params),config=typeof params.snapshotConfigId==='number'?await getConfigById(params.snapshotConfigId,record.type):null
+  if(!config)throw new Error('请恢复原生成任务的模型配置后重试')
+  db.update(schema.sysTask).set({status:'processing',errorMsg:null,updatedAt:now()}).where(eq(schema.sysTask.id,id)).run()
+  if(record.type==='image'?imageAdapters[config.provider]:videoAdapters[config.provider])void pollTask(record,config,record.taskId)
+  else void processTask(id,config)
 }

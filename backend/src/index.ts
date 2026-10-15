@@ -1,3 +1,6 @@
+import { toolboxService } from './services/production-tools/jobs.js'
+import { creativeToolService } from './services/creative-tools/jobs.js'
+import { recoverCreativePipelines } from './services/creative-pipeline/runner.js'
 import 'dotenv/config'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
@@ -7,6 +10,8 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 import dramas from './routes/dramas.js'
+import creative from './routes/creative.js'
+import { recoverCreativeRenders } from './services/creative-projects.js'
 import episodes from './routes/episodes.js'
 import storyboards from './routes/storyboards.js'
 import scenes from './routes/scenes.js'
@@ -36,7 +41,7 @@ const app = new Hono()
 
 // Middleware
 app.use('*', cors({
-  origin: ['http://localhost:3013', 'http://localhost:5679'],
+  origin: ['http://localhost:3014', 'http://127.0.0.1:3014', 'http://localhost:5679'],
   credentials: true,
 }))
 app.use('*', requestLogger)
@@ -52,6 +57,7 @@ app.get('/api/v1/health', (c) => c.json({
 // API routes
 const api = new Hono()
 api.route('/dramas', dramas)
+api.route('/creative', creative)
 api.route('/episodes', episodes)
 api.route('/storyboards', storyboards)
 api.route('/scenes', scenes)
@@ -76,17 +82,29 @@ app.route('/api/v1', api)
 // 生成的图片/视频按 uuid 命名、内容不变，标记为 immutable 让浏览器长缓存
 app.use('/static/*', async (c, next) => {
   await next()
-  if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable')
+  if (c.res.ok) {
+    c.header('Cache-Control', 'public, max-age=31536000, immutable')
+    c.header('X-Content-Type-Options', 'nosniff')
+    if (c.req.path.includes('/toolbox/') && /\.(?:html?|js|svg|json|srt|vtt|txt|zip|blend)$/i.test(c.req.path)) {
+      c.header('Content-Disposition', 'attachment')
+      c.header('Content-Security-Policy', "sandbox; default-src 'none'")
+    }
+  }
 })
 app.use('/static/*', serveStatic({ root: DATA_ROOT }))
 
 // Serve frontend (production build) — 桌面版由主进程注入 FRONTEND_DIST（resources/frontend）
-const distPath = process.env.FRONTEND_DIST || path.join(projectRoot, 'frontend', 'dist')
+const distPath = process.env.FRONTEND_DIST || path.join(projectRoot, 'frontend-react', 'dist')
 app.use('*', serveStatic({ root: distPath }))
 app.get('*', serveStatic({ root: distPath, path: 'index.html' }))
 
 const port = Number(process.env.PORT || 5679)
-console.log(`🚀 Huobao Drama TS server on http://localhost:${port}`)
+recoverCreativeRenders()
+recoverCreativePipelines()
+creativeToolService.recover()
+toolboxService.recover()
+db.update(schema.creativeMessages).set({ status: 'failed' }).where(eq(schema.creativeMessages.status, 'pending')).run()
+console.log(`🚀 Video Factory TS server on http://localhost:${port}`)
 
 // 进程重启后内存中的轮询线程全部丢失,残留的 processing 任务永远不会完成,
 // 启动时统一标记为 failed,避免前端一直显示"生成中"

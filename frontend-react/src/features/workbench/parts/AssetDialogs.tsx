@@ -158,8 +158,8 @@ export function AssetDetailDialog({ kind, id, onClose }: AssetDetailDialogProps)
       showClose={false}
       footer={
         // 原 .asset-detail-foot 布局意图：次级动作居左、主操作居右
-        <div className="flex w-full items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 w-full flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             <button type="button" className={buttonVariants({ variant: 'danger' })} onClick={() => ui.askDeleteAsset(kind, id, view.name)}>
               {t('common.delete')}
             </button>
@@ -167,7 +167,7 @@ export function AssetDetailDialog({ kind, id, onClose }: AssetDetailDialogProps)
               {t('common.close')}
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
             <button type="button" className={buttonVariants({})} disabled={wb.isUploadingAsset(kind, id)} onClick={() => wb.uploadAssetImage(kind, id)}>
               {wb.isUploadingAsset(kind, id) ? <Loader2 size={11} className="animate-spin" /> : <UploadIcon />}
               {t('episode.asset.uploadImage')}
@@ -207,6 +207,7 @@ export function AssetDetailDialog({ kind, id, onClose }: AssetDetailDialogProps)
             </div>
             <button
               type="button"
+              aria-label={t('episode.viewer.imagePreview')}
               className="relative block aspect-video w-full cursor-zoom-in overflow-hidden rounded-control border border-outline bg-elevated p-0 text-content-subtle disabled:cursor-default disabled:opacity-100 focus-visible:border-[color:var(--hb-action-primary)] focus-visible:shadow-[0_0_0_3px_var(--hb-focus-ring)] focus-visible:outline-none"
               disabled={!src}
               onClick={() =>

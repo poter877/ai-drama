@@ -3,11 +3,23 @@
  * 自 MySQL 迁移：varchar(x)→text（SQLite 不校验长度）、int→integer、
  * boolean→integer boolean mode、时间戳仍为 text 存 ISO 字符串，表/列名不变。
  */
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core'
+
+export const creativeMessages = sqliteTable('creative_messages', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull(),
+  role: text('role').notNull(),
+  content: text('content').notNull(),
+  actions: text('actions').notNull().default('[]'),
+  status: text('status').notNull().default('completed'),
+  createdAt: text('created_at').notNull(),
+})
 
 export const dramas = sqliteTable('dramas', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   title: text('title').notNull(),
+  projectType: text('project_type').notNull().default('drama'),
+  creativeCategory: text('creative_category'),
   description: text('description'),
   genre: text('genre'),
   style: text('style').default('3d'),
@@ -288,4 +300,88 @@ export const appSettings = sqliteTable('app_settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
   updatedAt: text('updated_at').notNull(),
+})
+
+// Creative videos are independent documents, never synthetic episodes/storyboards.
+export const creativeProjects = sqliteTable('creative_projects', {
+  projectId: integer('project_id').primaryKey().references(() => dramas.id),
+  revision: integer('revision').notNull().default(1),
+  approvedRevision: integer('approved_revision'),
+  document: text('document').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+export const creativeShotTasks = sqliteTable('creative_shot_tasks', {
+  projectId: integer('project_id').notNull().references(() => dramas.id),
+  shotId: text('shot_id').notNull(),
+  kind: text('kind').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  taskId: integer('task_id').notNull().references(() => sysTask.id),
+}, table => [primaryKey({ columns: [table.projectId, table.shotId, table.kind] })])
+
+export const creativeRenders = sqliteTable('creative_renders', {
+  outputs: text('outputs').notNull().default('[]'),
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull().references(() => dramas.id),
+  revision: integer('revision').notNull(),
+  snapshot: text('snapshot').notNull(),
+  status: text('status').notNull().default('pending'),
+  progress: integer('progress').notNull().default(0),
+  videoUrl: text('video_url'),
+  subtitleUrl: text('subtitle_url'),
+  duration: real('duration'),
+  errorMsg: text('error_msg'),
+  warnings: text('warnings').notNull().default('[]'),
+  createdAt: text('created_at').notNull(),
+  completedAt: text('completed_at'),
+})
+
+export const creativePipelineRuns = sqliteTable('creative_pipeline_runs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull().references(() => dramas.id),
+  definition: text('definition').notNull(),
+  snapshot: text('snapshot').notNull(),
+  revision: integer('revision').notNull(),
+  version: integer('version').notNull().default(1),
+  status: text('status').notNull().default('ready'),
+  cursor: integer('cursor').notNull().default(0),
+  stages: text('stages').notNull(),
+  error: text('error'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+export const creativePipelineEvents = sqliteTable('creative_pipeline_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  runId: integer('run_id').notNull().references(() => creativePipelineRuns.id),
+  stageId: text('stage_id'),
+  kind: text('kind').notNull(),
+  payload: text('payload').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+export const creativeToolJobs = sqliteTable('creative_tool_jobs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull().references(() => dramas.id),
+  kind: text('kind').notNull(), fingerprint: text('fingerprint').notNull(),
+  revision: integer('revision').notNull(), input: text('input').notNull(),
+  status: text('status').notNull().default('queued'), remoteId: text('remote_id'),
+  progress: integer('progress').notNull().default(0), result: text('result').notNull().default('{}'),
+  error: text('error'), createdAt: text('created_at').notNull(), updatedAt: text('updated_at').notNull(),
+})
+export const creativeModels = sqliteTable('creative_models', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull().references(() => dramas.id),
+  name: text('name').notNull(), url: text('url').notNull(), metadata: text('metadata').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+/** Durable, per-project production-tool work, separate from engine stage checkpoints. */
+export const productionToolJobs = sqliteTable('production_tool_jobs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull().references(() => dramas.id),
+  toolId: text('tool_id').notNull(), fingerprint: text('fingerprint').notNull(),
+  revision: integer('revision').notNull(), input: text('input').notNull(),
+  state: text('state').notNull().default('{}'), status: text('status').notNull().default('queued'),
+  progress: integer('progress').notNull().default(0), result: text('result').notNull().default('{}'),
+  error: text('error'), createdAt: text('created_at').notNull(), updatedAt: text('updated_at').notNull(),
 })

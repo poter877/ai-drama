@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "화바오 숏드라마",
+    "title": "비디오 팩토리",
     "updateAvailable": "새 버전 v{version}을 사용할 수 있습니다. 「설정 → 업데이트 정보」에서 업그레이드하세요"
   },
   "common": {
@@ -96,7 +96,7 @@
   "index": {
     "hero": {
       "title": "프로젝트 런처",
-      "sub": "하나의 아이디어에서 한 편의 숏드라마까지, AI가 전 과정을 대신합니다",
+      "sub": "아이디어를 영상으로 만들어 보세요",
       "projectCount": "프로젝트 {n}개",
       "activeCount": "{n}개 진행 중",
       "styleCount": "비주얼 스타일 {n}종"
@@ -113,8 +113,8 @@
     "projectMeta": "캐릭터 {chars} · 장면 {scenes} · {eps}화",
     "emptyFilteredTitle": "일치하는 프로젝트가 없습니다",
     "emptyFilteredDesc": "검색어나 필터 조건을 조정하세요.",
-    "emptyTitle": "첫 번째 숏드라마 프로젝트 만들기",
-    "emptyDesc": "생성 후 화를 선택해 제작을 시작합니다.",
+    "emptyTitle": "첫 영상 프로젝트 만들기",
+    "emptyDesc": "드라마 또는 크리에이티브 영상을 만들고 제작을 시작하세요.",
     "deleted": "삭제됨",
     "noEpisodes": "에피소드가 없습니다",
     "episodeN": "제 {n}화",
@@ -132,7 +132,7 @@
     },
     "createDialog": {
       "title": "새 프로젝트",
-      "desc": "생성 후 프로젝트 페이지에서 화를 선택합니다",
+      "desc": "프로젝트 유형을 선택하고 새로운 창작을 시작하세요",
       "name": "프로젝트 이름",
       "namePlaceholder": "예: 도시 로맨스 드라마 『타임 우체국』",
       "style": "비주얼 스타일",
@@ -140,18 +140,46 @@
       "aspectRatio": "화면 비율",
       "aspectRatioPlaceholder": "화면 비율 선택",
       "aspectRatioHint": "생성 후 고정되며, 영상 생성은 이 비율로 통일됩니다",
-      "submit": "프로젝트 생성"
+      "submit": "프로젝트 생성",
+      "projectType": "프로젝트 유형",
+      "dramaTitle": "숏드라마 프로젝트",
+      "dramaDescription": "대본, 캐릭터, 에피소드를 구성해 이어지는 이야기를 제작",
+      "creativeTitle": "크리에이티브 영상",
+      "creativeDescription": "스토리, 홍보, 발표 영상을 만들거나 기존 소재 재편집",
+      "creativeCategory": "영상 유형",
+      "creativeNamePlaceholder": "예: 1분 만에 알아보는 블랙홀",
+      "creativeSetupHint": "생성 후 전용 작업실에서 기획, 미디어 제작, 내보내기를 진행합니다.",
+      "categories": {
+        "explainer": {
+          "title": "지식 해설",
+          "description": "화면, 내레이션, 자막으로 주제를 쉽게 설명"
+        },
+        "product": {
+          "title": "제품 홍보",
+          "description": "제품 자료와 주요 장점을 활용해 홍보 영상 제작"
+        },
+        "cinematic": {
+          "title": "영화풍 단편",
+          "description": "아이디어를 예고편이나 감각적인 단편으로 제작"
+        },
+        "montage": {
+          "title": "영상 믹스",
+          "description": "기존 영상을 조합하고 음성과 자막 추가"
+        }
+      }
     },
     "deleteDialog": {
       "title": "프로젝트 삭제",
-      "message": "「{title}」을(를) 삭제하시겠습니까? 하위 에피소드, 스토리보드, 생성 기록이 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+      "message": "「{title}」을(를) 삭제하시겠습니까? 하위 에피소드, 스토리보드, 생성 기록이 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+      "creativeMessage": "“{title}”을 삭제할까요? 기획안, 대화와 내보내기 기록에 더 이상 접근할 수 없습니다."
     },
     "time": {
       "justNow": "방금",
       "minutesAgo": "{n}분 전",
       "hoursAgo": "{n}시간 전",
       "daysAgo": "{n}일 전"
-    }
+    },
+    "allProjects": "모든 프로젝트"
   },
   "detail": {
     "head": {
@@ -350,7 +378,7 @@
       "serverApply": "지금 업데이트",
       "serverApplyStarted": "업데이트가 시작되었습니다: Watchtower가 새 이미지를 받아 컨테이너를 재생성합니다. 몇 분 후 페이지를 새로고침하세요",
       "serverApplyFailed": "업데이트 시작 실패",
-      "serverManualHint": "서버 배포: 배포 디렉터리에서 다음을 실행하세요",
+      "serverManualHint": "서버 배포: 소스를 업데이트한 후 배포 디렉터리에서 실행하세요",
       "serverNote": "참고: Watchtower가 설정된 Docker 배포에서는 원클릭 업데이트(새 이미지 pull + 컨테이너 재생성)가 가능합니다. 미설정 시 안낸된 명령을 직접 실행하세요."
     },
     "agents": {
@@ -879,7 +907,7 @@
     "helpTitle": "가이드",
     "index": {
       "welcome": {
-        "title": "👋 휘바오 숏드라마에 오신 것을 환영합니다",
+        "title": "👋 비디오 팩토리에 오신 것을 환영합니다",
         "desc": "소설 → 대본 → 에셋 → 스토리보드 → 영상 → 완성, 모두 한곳에서. 먼저 AI 서비스를 설정하고 첫 프로젝트를 만들어 보세요."
       },
       "create": {

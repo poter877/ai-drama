@@ -19,6 +19,6 @@
 @import './exceptions.css' layer(components);
 @import './theme.css';
 
-/* 源码扫描：React src 与根 index.html；不扫描旧 Vue、后端与构建产物 */
+/* 源码扫描：React src 与根 index.html；排除后端与构建产物 */
 @source '../../';
 @source '../../../index.html';

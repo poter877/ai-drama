@@ -1,5 +1,5 @@
 /**
- * DesktopBootstrap — 桌面桥生命周期（旧 app.vue onMounted 逻辑）：
+ * DesktopBootstrap — 桌面桥生命周期：
  * - 订阅迁移进度：done → 展示「完成」后刷新；error → 关遮罩（toast 由触发方提示）
  * - 启动 25s 后静默查询更新状态，available 时提示一次
  * 只注册一次；Effect cleanup 取消订阅与 timer（StrictMode 下注册→清理→注册无重复提示）。

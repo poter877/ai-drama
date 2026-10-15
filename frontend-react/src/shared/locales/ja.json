@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "火宝ショートドラマ",
+    "title": "動画工場",
     "updateAvailable": "新バージョン v{version} があります。「設定 → 更新について」でアップグレードできます"
   },
   "common": {
@@ -96,7 +96,7 @@
   "index": {
     "hero": {
       "title": "プロジェクトランチャー",
-      "sub": "ひとつのアイデアから一本のショートドラマへ、AI が全工程を代行",
+      "sub": "アイデアから次の映像へ",
       "projectCount": "{n} 件のプロジェクト",
       "activeCount": "{n} 件進行中",
       "styleCount": "{n} 種類のビジュアルスタイル"
@@ -113,8 +113,8 @@
     "projectMeta": "{chars} キャラクター · {scenes} シーン · {eps} 話",
     "emptyFilteredTitle": "一致するプロジェクトがありません",
     "emptyFilteredDesc": "検索語やフィルタ条件を調整してください。",
-    "emptyTitle": "最初のショートドラマプロジェクトを作成",
-    "emptyDesc": "作成後、話を選んで制作を開始します。",
+    "emptyTitle": "最初の動画プロジェクトを作成",
+    "emptyDesc": "ドラマやクリエイティブ動画を作成して、制作を始めましょう。",
     "deleted": "削除しました",
     "noEpisodes": "エピソードがありません",
     "episodeN": "第 {n} 話",
@@ -132,7 +132,7 @@
     },
     "createDialog": {
       "title": "新規プロジェクト",
-      "desc": "作成後、プロジェクトページで話を選択します",
+      "desc": "プロジェクトの種類を選んで、新しい制作を始めましょう",
       "name": "プロジェクト名",
       "namePlaceholder": "例：都市ラブストーリー『タイムポスト局』",
       "style": "ビジュアルスタイル",
@@ -140,18 +140,46 @@
       "aspectRatio": "アスペクト比",
       "aspectRatioPlaceholder": "アスペクト比を選択",
       "aspectRatioHint": "作成後に固定され、動画生成はこの比率で統一されます",
-      "submit": "プロジェクトを作成"
+      "submit": "プロジェクトを作成",
+      "projectType": "プロジェクトの種類",
+      "dramaTitle": "ショートドラマ",
+      "dramaDescription": "脚本・キャラクター・各話を組み立て、連続した物語を制作",
+      "creativeTitle": "クリエイティブ動画",
+      "creativeDescription": "ストーリー、PR、解説を制作し、既存素材を再編集",
+      "creativeCategory": "動画の種類",
+      "creativeNamePlaceholder": "例：1分でわかるブラックホール",
+      "creativeSetupHint": "作成後、専用の制作画面で構成・素材制作・書き出しを進められます。",
+      "categories": {
+        "explainer": {
+          "title": "解説動画",
+          "description": "映像・ナレーション・字幕でテーマをわかりやすく解説"
+        },
+        "product": {
+          "title": "商品PR",
+          "description": "商品の素材や魅力を使ってPR動画を制作"
+        },
+        "cinematic": {
+          "title": "映画風ショート",
+          "description": "アイデアを予告編や映像作品に"
+        },
+        "montage": {
+          "title": "素材ミックス",
+          "description": "手持ちの素材を組み合わせ、音声と字幕を追加"
+        }
+      }
     },
     "deleteDialog": {
       "title": "プロジェクトを削除",
-      "message": "「{title}」を削除しますか？配下のエピソード、分镜、生成記録もすべて削除されます。この操作は元に戻せません。"
+      "message": "「{title}」を削除しますか？配下のエピソード、分镜、生成記録もすべて削除されます。この操作は元に戻せません。",
+      "creativeMessage": "「{title}」を削除しますか？制作案・会話・書き出し履歴にアクセスできなくなります。"
     },
     "time": {
       "justNow": "たった今",
       "minutesAgo": "{n} 分前",
       "hoursAgo": "{n} 時間前",
       "daysAgo": "{n} 日前"
-    }
+    },
+    "allProjects": "すべてのプロジェクト"
   },
   "detail": {
     "head": {
@@ -350,7 +378,7 @@
       "serverApply": "今すぐ更新",
       "serverApplyStarted": "更新を開始しました：Watchtower が新しいイメージを取得してコンテナを再作成します。数分後にページを更新してください",
       "serverApplyFailed": "更新の開始に失敗しました",
-      "serverManualHint": "サーバーデプロイ：デプロイディレクトリで実行してください",
+      "serverManualHint": "サーバーデプロイ：ソースを更新後、デプロイディレクトリで実行してください",
       "serverNote": "補足：Watchtower を設定した Docker デプロイではワンクリック更新（新イメージ取得＋コンテナ再作成）が可能です。未設定の場合は表示されたコマンドを手動で実行してください。"
     },
     "agents": {
@@ -879,7 +907,7 @@
     "helpTitle": "ガイド",
     "index": {
       "welcome": {
-        "title": "👋 火宝短劇へようこそ",
+        "title": "👋 動画工場へようこそ",
         "desc": "小説 → 脚本 → アセット → 絵コンテ → 動画 → 完成、すべてワンストップ。まず AI サービスを設定し、最初のプロジェクトを作成しましょう。"
       },
       "create": {

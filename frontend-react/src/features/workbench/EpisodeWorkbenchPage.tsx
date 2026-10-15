@@ -1,5 +1,5 @@
 /**
- * 工作台路由入口（旧 views/drama/episode.vue 的模板层）：
+ * 工作台路由入口：
  * 参数校验 → WorkbenchProvider（数据/动作）→ 顶栏/侧栏/主面板/任务抽屉/弹窗。
  * 预览弹窗（图片/镜头/成片）与资产弹窗为页面级状态，经 WorkbenchUiContext 分发。
  */

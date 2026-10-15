@@ -1,12 +1,12 @@
-# 🎬 Huobao Drama - AI 短剧生成平台
+# 🎬 视频工厂 - AI 短剧生成平台
 
 <div align="center">
 
 **基于 TypeScript 全栈的 AI 短剧自动化生产平台**
 
-[![Node Version](https://img.shields.io/badge/Node.js-20+-339933?style=flat&logo=node.js)](https://nodejs.org)
-[![Vue Version](https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat&logo=vue.js)](https://vuejs.org)
-[![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+[![Node Version](https://img.shields.io/badge/Node.js-22.12+-339933?style=flat&logo=node.js)](https://nodejs.org)
+[![React Version](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react)](https://react.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![下载](https://img.shields.io/github/v/release/chatfire-AI/huobao-drama?style=flat&logo=github&label=%E4%B8%8B%E8%BD%BD)](https://github.com/chatfire-AI/huobao-drama/releases/latest)
 
 [English](README.md) | **简体中文** | [日本語](README.ja.md) | [한국어](README.ko.md)
@@ -19,7 +19,7 @@
 
 部署完成后在「设置 → 火宝快捷配置」粘贴 Key，一键写入三条推荐配置，开箱即用
 
-<h3>📥 <a href="https://github.com/chatfire-AI/huobao-drama/releases/latest">下载桌面版（macOS / Windows）</a></h3>
+<h3>📥 <a href="https://github.com/chatfire-AI/huobao-drama/releases/latest">上游历史桌面版本（macOS / Windows）</a></h3>
 <h3>🌐 <a href="https://www.chatfire.site">官方网站</a></h3>
 
 </div>
@@ -28,7 +28,7 @@
 
 ## 📖 项目简介
 
-Huobao Drama 是一个基于 AI 的短剧自动化生产平台，实现从剧本生成、角色设计、分镜制作到视频合成的全流程自动化。
+视频工厂 是一个基于 AI 的短剧自动化生产平台，实现从剧本生成、角色设计、分镜制作到视频合成的全流程自动化。
 
 ### 🎯 核心价值
 
@@ -40,7 +40,7 @@ Huobao Drama 是一个基于 AI 的短剧自动化生产平台，实现从剧本
 ### 🛠️ 技术架构
 
 ```
-frontend/   — Nuxt 3 + Vue 3 + TypeScript (纯 CSS，无 UI 框架)
+frontend-react/ — React 19 + TypeScript + Vite 7 + Tailwind CSS v4
 backend/    — Hono + Drizzle ORM + Mastra AI Agents + better-sqlite3
 backend/workspace/skills/ — Agent 技能定义 (SKILL.md，支持界面在线编辑)
 desktop/    — Electron 桌面版（主进程 + esbuild 打包 + electron-builder 出 dmg/exe）
@@ -50,6 +50,82 @@ data/       — 生成资源文件与 SQLite 数据库
 ---
 
 ## ✨ 功能特性
+
+### 统一模型与服务
+
+短剧与创意视频的制作流程独立，模型配置共用「设置 → 模型与服务」和 `ai_service_configs`。支持文本、图片、视频、语音合成、语音识别、口型同步、骨骼绑定、联网资料、联网素材九类能力，各类可配置多个账户，优先级最高的启用配置为默认项。联网资料与素材是外部服务，不是生成模型。短剧 Agent、创意规划、聊天和翻译共用文本模型工厂，统一处理服务商适配、温度、输出上限和兼容接口参数；图片和视频共用生成任务服务。
+
+升级时自动迁移原有创意服务配置，并为此前使用 OpenAI 文本配置的语音功能保留独立的语音配置。之后语音直接使用对应配置中的模型、地址和密钥。密钥不回传浏览器，编辑时留空保留原值；切换服务地址需重新填写密钥。新建的专用服务任务保存配置编号，恢复查询时沿用该配置；删除或停用它后需要恢复配置才能继续。
+
+Sync、Meshy、Tavily、Pexels 当前使用官方地址和预设接口。设置页对这些服务仅检查配置格式，实际认证在执行任务时验证。语音识别目前使用能输出字幕时码的 Whisper，配音模型可单独设置。
+
+### 全部制作工具箱
+
+创意项目中的「制作工具箱」按目录展示本地 OpenMontage 参考版本的全部 **153 个唯一命名工具与素材源项**。参考目录里的 **190 是 Python 文件数量**，包括注册表、协议、鉴权和公共辅助文件；它不是 190 个独立可执行工具。项目使用原生 TypeScript/React 实现，运行时不导入参考项目。
+
+工具箱覆盖本地剪辑与转场、声音处理、字幕、画面增强、图表与数学动画、角色动作、三维场景、录屏、生成模型、数字人、素材检索与交付打包。可以搜索、按类别/服务商筛选，选择项目素材或先前产物作为输入，编辑制作参数，执行后预览、下载并导入素材库或指定镜头。SRT/VTT 及工具生成的 JSON 字幕可写回原片字幕，GLB 可加入三维模型库。
+
+[逐项执行映射与替代说明](backend/docs/production-tool-coverage.json)记录每个参考 ID 的实际执行路径和服务商。原厂入口、统一服务替代和来源页面检索分别标注。Sora 的原 Videos API 已于 2026-09-24 停用，相关入口使用可用视频模型替代；旧 Imagen 入口迁移到 Nano Banana。Gemini Omni 旧直连、Kling TTS、LTX Modal 和 MiniMax 图像使用同能力的共享服务。部分素材网站只提供来源页面检索，不伪造下载链接或许可。
+
+全部服务使用「模型与服务」管理账户、模型和服务参数。Fal、Replicate、Atlas Cloud、Runway、可灵、豆包、腾讯混元以及各语音/素材服务通过实际协议适配。可灵凭据在 API Key 填写 `AccessKey:SecretKey`，腾讯凭据填写 `SecretId:SecretKey`。Google Cloud 音乐服务需要有权限的 OAuth 访问令牌及项目参数。工作流和 Voice ID 等参数放在服务参数 JSON，密钥统一填在 API Key。
+
+ComfyUI 的九个模型入口需要已部署的服务、对应模型/节点及 API 格式工作流；可在统一配置的 `service_options.workflow_json` 保存工作流，并设置提示词、媒体节点映射。工具不会自动安装第三方节点或模型权重。
+
+| 可选本地功能 | 运行条件 |
+| --- | --- |
+| Blender 场景及视频 | Blender 4.x，设置 `BLENDER_BIN` |
+| 背景分割 | rembg CLI 和分割模型，设置 `REMBG_BIN` |
+| 人脸跟踪 | OpenCV，设置 `PRODUCTION_PYTHON_BIN` |
+| 人脸修复 | GFPGAN、对应权重及 PyTorch，设置 `GFPGAN_ROOT` 和 Python |
+| 网页视频/字幕获取 | yt-dlp，设置 `YTDLP_BIN`；视频处理沿用内置 FFmpeg |
+| 离线配音 | Piper 及音色模型，设置 `PIPER_BIN`、`PIPER_MODEL` |
+| 三维可交互场景 | Three.js 已作为后端与桌面运行依赖；导出含其 MIT 许可的场景包 |
+
+缺少模型配置或运行依赖时，目录会显示不可用原因。任务与远端编号持久保存；恢复查询沿用原配置，未知提交不会自动重复提交。明确选择「重新提交任务」才会发起新请求。停止查询不会撤销服务商已受理的任务。产物通过实际图像解码、音视频探测或模型检查；应用结果仍需当前项目版本匹配，防止覆盖并发修改。
+
+验证包括真实 FFmpeg/Sharp 媒体、Three.js 浏览器渲染、服务协议与鉴权、未知提交恢复、项目隔离、字幕与模型导入。未配置服务密钥时不声称已完成云端付费生成实测。
+
+12 类制作流程已接入自动工具编排。进入创意项目的「制作流程」，在「制作要求 → 自动制作」选定制作方式与服务；未选专用模型的普通图片/视频仍使用统一模型配置。流程会根据已批准的镜头内容选用工具，自动传递真实文件与结构化结果，并将产物写回素材、镜头、字幕、音轨和成片。相同能力的模型是可选替代，不会把所有服务重复运行。
+
+| 流程 | 按需自动执行的制作链 |
+| --- | --- |
+| 科普解说 | 来源分析、图解/真实公式动画、旁白、字幕、合成与验片 |
+| 动态图形 | 批准的图形/角色/三维参数、运动渲染、后期与合成 |
+| 角色动画 | 角色规格 → 关节 → 姿势库 → 动作时间轴 → 结构检查 → 视频渲染；三维路径可接绑定模型 |
+| 电影感短片 | 资料与镜头规划、选定图像/视频模型、配乐、调色与交付 |
+| 纪录片 / 视频文章 | 原片分析、来源检索下载、证据与原稿检索、选段和来源清单 |
+| 实拍 + AI 混合 | 实拍分析与裁切、补充画面制作、统一后期、合成 |
+| 真人口播 / 访谈 | 原稿识别、选段、静音检测或裁切、声音增强、构图与字幕 |
+| 数字人讲解 | 选定数字人/口型服务、真实人物素材和配音、口型成片回填 |
+| 软件演示 / 录屏 | 已有录屏分析、步骤选段、留边构图、讲解与字幕；只有明确开启才录制桌面 |
+| 播客转视频 | 原声分析与选段、波形/标题画面、字幕和声音处理 |
+| 长视频批量切片 | 原片分析与原稿检索、逐段裁切、构图、独立视频与字幕交付 |
+| 字幕翻译 / 配音 | 保留真实时码、字幕翻译、配音时长拟合、声音替换和导出 |
+
+流程内每个工具保存输入、依赖、进度、远端编号、产物和回写记录。可以直接在阶段内恢复任务；未知提交必须核对后恢复，不会自动重发。短配音补齐，长配音最多以 1.5 倍语速匹配镜头，超出会暂停；关闭原声不会关闭新配音。静音裁切会使用真实保留区间更新镜头时长，后续字幕重新计时。质检失败阻止交付。Three.js 可通过 Chrome/Chromium 确定性渲染为 MP4（可用 `PRODUCTION_CHROME_BIN` 指定），支持 GLB 自带骨骼动画；Blender 路径仍需本机安装。
+
+缺少服务、模型、真实来源或必要结构参数时，流程会保留已有任务并显示需补充内容。来源页面搜索不会被当作已下载素材，无时码识别只保存原稿；连续讲稿不使用会重排镜头的节拍混剪。已有流程记录保留原定义，新增流程使用第二版工具编排。
+
+接口与迁移依据：[Sora 停用公告](https://developers.openai.com/api/docs/deprecations)、[Imagen 迁移说明](https://ai.google.dev/gemini-api/docs/imagen)、[Fal 队列](https://fal.ai/docs/documentation/model-apis/inference/queue)、[Replicate](https://replicate.com/docs/reference/http)、[ComfyUI](https://docs.comfy.org/development/comfyui-server/comms_routes)。
+
+### 创意视频制作工具
+
+在「设置 → 模型与服务」填写并启用所需服务的 API Key，再进入创意项目的「制作工具」。服务密钥不会回传到浏览器；外部生成任务使用对应服务账户的额度。
+
+| 功能 | 服务与输入 | 项目中的结果 |
+| --- | --- | --- |
+| 数字人口型 | Sync；人物视频或人物图 + 逐镜头配音（图片使用 sync-3） | 成片下载、预览、替换原镜头，保留配音与字幕 |
+| 三维骨骼绑定 | Meshy；不超过 50MB、内嵌纹理的人形 GLB | 绑定 GLB / FBX、可用的基础动作、三维预览与下载 |
+| 联网资料 | Tavily；主题或自定义关键词 | 网页摘要与出处进入资料研究 / 创意阶段，供脚本引用与审阅 |
+| 联网素材 | Pexels；关键词、图片或视频 | 手动挑选下载，或自动导入 1–3 个候选到原始素材库，保留作者和许可 |
+
+逐镜头配音可在「画面编排」上传，也可在创作需求开启已有的自动配音。自动口型仅处理有旁白或配音的镜头。角色动画的骨骼阶段可指定已上传模型并自动绑定；三维模型文件还需要后续渲染才能成为影片画面。
+
+自动流程选项需保存到项目后生效。任务与产物持久保存，重启可恢复查询；提交结果不明时需从服务商后台核对任务编号，避免重复计费。镜头输入变化后，旧口型成片仍可下载，但不会覆盖新修改。绑定目前面向人形角色；应先在预览中检查肢体、蒙皮和动作。
+
+联网内容和素材须在阶段审阅时核对。原片剪辑、录屏、访谈等流程仍需上传真实原片，联网补充素材不能代替原片。
+
+接口依据：[Sync](https://sync.so/docs/developer-guides/asset-uploads)、[Meshy](https://docs.meshy.ai/en/api/rigging)、[Tavily](https://docs.tavily.com/documentation/api-reference/endpoint/search)、[Pexels](https://www.pexels.com/api/documentation/)。服务适配与流程为本项目实现，不在运行时依赖 references/OpenMontage。
 
 ### 🎭 角色管理
 
@@ -106,7 +182,7 @@ data/       — 生成资源文件与 SQLite 数据库
 
 | 软件 | 版本要求 | 说明 |
 |---|---|---|
-| **Node.js** | 20+ | 前后端运行环境 |
+| **Node.js** | 22.12+ | 前后端运行环境 |
 | **npm** | 9+ | 包管理工具 |
 
 > **数据库零安装**：内置 SQLite（单文件，随项目数据目录存放），无需安装任何数据库服务。
@@ -123,7 +199,7 @@ data/       — 生成资源文件与 SQLite 数据库
 | `STORAGE_PATH` | `<仓库根>/data/static` | 生成文件存储目录 |
 | `HUOBAO_DATA_DIR` | — | 桌面版由 Electron 主进程注入（userData 数据根） |
 | `WORKSPACE_PATH` | `backend/workspace` | Agent 技能/提示词目录（桌面版指向 userData 可写副本） |
-| `FRONTEND_DIST` | `frontend/dist` | 前端静态产物目录 |
+| `FRONTEND_DIST` | `frontend-react/dist` | 前端静态产物目录 |
 | `FFMPEG_BIN` / `FFPROBE_BIN` | npm 内置二进制 | 自定义 ffmpeg/ffprobe 可执行文件路径 |
 | `PUBLIC_BASE_URL` | — | Seedance 引用本地参考资源时所需的公网地址（服务器部署用） |
 
@@ -140,7 +216,7 @@ cd huobao-drama
 cd backend && npm install
 
 # 安装前端依赖
-cd ../frontend && npm install
+cd ../frontend-react && npm install
 ```
 
 ### 🎯 启动项目
@@ -155,11 +231,11 @@ cd backend
 npm run dev
 
 # 终端2：启动前端
-cd frontend
+cd frontend-react
 npm run dev
 ```
 
-- 前端地址: `http://localhost:3013`
+- 前端地址: `http://localhost:3014`
 - 后端 API: `http://localhost:5679/api/v1`
 - 前端自动代理 `/api` 和 `/static` 到后端
 
@@ -168,14 +244,11 @@ npm run dev
 后端同时提供 API 和前端静态文件：
 
 ```bash
-# 1. 构建前端
-cd frontend && npm run generate
+# 1. 构建 React 前端
+npm run build:frontend
 
-# 2. 复制构建产物到后端读取的目录（generate 产物在 .output/public，后端只读取 frontend/dist）
-cp -r .output/public dist
-
-# 3. 启动后端
-cd ../backend && npm start
+# 2. 启动后端，自动提供 frontend-react/dist 静态页面
+npm --prefix backend start
 ```
 
 访问: `http://localhost:5679`
@@ -285,6 +358,8 @@ cd backend && npx tsx scripts/import-mysql-to-sqlite.ts
 
 ### 🖥️ 桌面应用（推荐）
 
+> 下方下载链接指向上游 Huobao Drama 的历史发行版。当前“视频工厂”的名称和 MIT 许可证以本仓库源码为准，请使用下方源码打包命令构建。桌面版保留原有 `HuobaoDrama` 数据目录，继续读取已有项目和配置。
+
 **⬇️ 预编译安装包下载：[国内镜像（腾讯云，推荐）](https://installer.chatfire.site/huobao-drama/v4.0.5/) · [GitHub Releases（海外）](https://github.com/chatfire-AI/huobao-drama/releases/latest)**
 
 | 平台 | 下载文件 |
@@ -309,21 +384,21 @@ curl -L -o /tmp/HuobaoDrama.dmg https://installer.chatfire.site/huobao-drama/v4.
 双击安装、开箱即用的桌面版（macOS + Windows）：数据库（SQLite）、生成的媒体文件、Agent 技能全部存放在用户数据目录，卸载应用不影响数据。
 
 ```bash
-# 一键打包（前端 generate → 后端 esbuild → electron-builder）
+# 一键打包（前端 Vite build → 后端 esbuild → electron-builder）
 npm run dist        # macOS dmg（arm64 + Intel）
 npm run dist:win    # Windows NSIS 安装器（win-x64，可在 macOS 上交叉打包）
 
 # 产物
-# desktop/release/HuobaoDrama-<版本>-arm64.dmg        (Apple Silicon)
-# desktop/release/HuobaoDrama-<版本>.dmg              (Intel)
-# desktop/release/HuobaoDrama Setup <版本>.exe        (Windows)
+# desktop/release/视频工厂-<版本>-arm64.dmg        (Apple Silicon)
+# desktop/release/视频工厂-<版本>.dmg              (Intel)
+# desktop/release/视频工厂 Setup <版本>.exe        (Windows)
 ```
 
 安装说明：
 
 - macOS 未签名包首次打开可能提示「App 已损坏，无法打开」（Apple Silicon 常见），这是 Gatekeeper 隔离属性导致，并非文件损坏。两种修复方式任选：
   1. **dmg 内自带修复脚本**：把 app 拖入「应用程序」后，双击 dmg 窗口底部的「如提示已损坏请双击我.command」，自动完成修复；
-  2. 或终端执行 `sudo xattr -cr /Applications/HuobaoDrama.app`。
+  2. 或终端执行 `sudo xattr -cr /Applications/视频工厂.app`。
 
   修复只需一次，之后双击图标即可启动，应用内自动更新也不受影响。
 - Windows 未签名包 SmartScreen 会提示「更多信息 → 仍要运行」
@@ -352,8 +427,7 @@ cd desktop && npm run feed
 桌面版开发调试：
 
 ```bash
-npm run build:frontend   # 前端静态产物（frontend/.output/public）
-cd desktop && npm run dev  # 打包后端 bundle 并以 Electron 窗口运行
+npm run dev:desktop
 ```
 
 > 已知限制：Seedance 视频模型引用本地参考资源时需要 `PUBLIC_BASE_URL` 公网地址，桌面版无公网入口，该场景会得到明确的中文报错；文生视频/图片等其余能力不受影响。
@@ -363,14 +437,11 @@ cd desktop && npm run dev  # 打包后端 bundle 并以 Electron 窗口运行
 ### 🏭 服务器部署方式
 
 ```bash
-# 1. 构建前端
-cd frontend && npm run generate
+# 1. 构建 React 前端
+npm run build:frontend
 
-# 2. 复制构建产物（generate 产物在 frontend/.output/public，后端只读取 frontend/dist，缺此步 API 正常但页面 404）
-cp -r .output/public dist && cd ..
-
-# 3. 启动后端
-cd backend && npm start
+# 2. 启动后端，自动提供 frontend-react/dist 静态页面
+npm --prefix backend start
 ```
 
 需要上传到服务器的文件：
@@ -378,7 +449,7 @@ cd backend && npm start
 ```
 backend/                    # 后端源码 + node_modules
 backend/workspace/skills/   # Agent 技能文件
-frontend/dist/              # 前端构建产物
+frontend-react/dist/              # 前端构建产物
 data/                       # 数据目录（首次运行自动创建）
 ```
 
@@ -413,37 +484,19 @@ server {
 
 > 媒体加载优化：生成图片时后端会自动产出 400px 缩略图（`*_thumb.webp`）供列表页加载，视频会抽取海报帧（`*_poster.jpg`）作为封面，前端仅在点开大图/播放时才加载原文件。历史存量文件可在 `backend/` 下执行 `npm run backfill-artwork` 一次性补齐。
 
-### 🐳 Docker 部署（含应用内更新）
+### 🐳 Docker 部署（React 源码构建）
 
-**方式一：预构建镜像（免克隆、免构建）**：多架构镜像（`linux/amd64` + `linux/arm64`），x86 服务器与 ARM 设备自动匹配
-
-```bash
-docker pull huobao/huobao-drama:4.0.6
-
-docker run -d \
-  --name huobao-drama \
-  -p 5679:5679 \
-  -v huobao-data:/app/data \
-  --restart unless-stopped \
-  huobao/huobao-drama:4.0.6
-```
-
-**方式二：docker compose（源码构建 + Watchtower 应用内更新）**：根目录提供一体化 `Dockerfile`（前端 generate + 后端依赖/运行时三阶段，后端与服务器部署一致走 tsx）与 `docker-compose.yml`（应用 + Watchtower）：
+默认镜像 `video-factory:local` 从当前源码构建。Compose 使用 `pull_policy: build`，镜像内自动完成 React 前端构建。
 
 ```bash
-# 1. 配置环境（Watchtower 令牌，app 与 watchtower 两侧必须一致）
-cp .env.example .env   # 修改 WATCHTOWER_TOKEN
-
-# 2. 构建并启动（发布时注入版本号，供「关于更新」比对）
-HUOBAO_VERSION=4.0.5 docker compose up -d --build
-
-# 3. 访问 http://localhost:5679
+cp .env.example .env
+docker compose up -d --build
+# 访问 http://localhost:5679
 ```
 
-- **数据持久化**：命名卷 `huobao-data` 挂载 `/app/data`（SQLite + 生成的图片/视频 + workspace/skills，更新镜像不丢数据）
-- **应用内更新**：compose 自带 [Watchtower](https://containrrr.dev/watchtower/) sidecar（`--label-enable` 只更新标记容器，`--cleanup` 清旧镜像，每天自检一次）。设置页「关于更新」可检查新版本并「立即更新」——后端经 Watchtower HTTP API 触发，拉新镜像重建容器，几分钟后刷新页面即可
-- **手动模式**：`docker-compose.yml` 中删除 app 的 `HUOBAO_WATCHTOWER_*` 两个环境变量（或整个 watchtower 服务）后，「关于更新」退化为新版本提示 + 手动命令 `docker compose pull && docker compose up -d`
-- **发布镜像**：`docker buildx build --platform linux/amd64,linux/arm64 --build-arg HUOBAO_VERSION=x.y.z -t huobao/huobao-drama:x.y.z -t huobao/huobao-drama:latest --push .`，版本清单与桌面版共用 GitHub Releases 的 `latest.json`（可用 `HUOBAO_UPDATE_FEED` 覆盖）
+沿用 `huobao-data` 数据卷保存数据库、媒体和 workspace。更新时先更新本地源码，再执行 `docker compose up -d --build`。
+
+可选镜像自动更新：先发布自己的 React 镜像，将 `VIDEO_FACTORY_IMAGE` 设为该镜像，配置 `HUOBAO_WATCHTOWER_URL=http://watchtower:8080` 并修改 `WATCHTOWER_TOKEN`，再执行 `docker compose --profile auto-update up -d --build`。独立发布渠道可用 `HUOBAO_UPDATE_FEED` 指定自己的版本清单。默认源码部署不启动 Watchtower。
 
 ---
 
@@ -465,12 +518,14 @@ HUOBAO_VERSION=4.0.5 docker compose up -d --build
 
 ### 前端
 
-- **框架**: Nuxt 3 (SPA 模式)
-- **语言**: Vue 3 + TypeScript
-- **路由**: 文件路由 (Vue Router 4)
-- **样式**: 纯 CSS + CSS Variables
-- **图标**: Lucide Vue
-- **国际化**: vue-i18n（中文 / English / 日本語 / 한국어）
+- **框架**: React 19 + Vite 7（SPA）
+- **语言**: TypeScript（strict）
+- **路由**: React Router 7
+- **服务端状态**: TanStack Query v5
+- **客户端状态**: Zustand v5
+- **样式**: Tailwind CSS v4 + 设计令牌
+- **图标**: Lucide React
+- **国际化**: i18next + react-i18next（中文 / English / 日本語 / 한국어）
 
 ---
 
@@ -494,7 +549,7 @@ A: 这是正常的首次部署引导。前往「设置」页，用「火宝快�
 
 ### Q: 前端无法连接后端 API？
 
-A: 检查后端是否启动，端口是否正确。开发模式下前端代理配置在 `frontend/nuxt.config.ts`。
+A: 检查后端是否启动，端口是否正确。开发模式下前端代理配置在 `frontend-react/vite.config.ts`。
 
 ### Q: 数据库表未创建？
 
@@ -588,11 +643,9 @@ A: 后端会在首次启动时自动创建所有表，检查日志确认初始�
 
 ## 📄 许可证
 
-本项目采用 **[CC BY-NC-SA 4.0](LICENSE)**（署名-非商业性使用-相同方式共享 4.0 国际）许可证。
+本项目采用 **[MIT 许可证](LICENSE)**。
 
-- ✅ 个人使用、学习研究、非商业项目均可自由使用
-- ✅ 允许修改与再分发，但须署名并以相同许可证共享
-- ❌ **禁止商用**——未经作者书面许可，不得将本项目整体或部分用于任何商业目的（包括付费服务、商业部署、转售等）
+允许使用、复制、修改、分发、再许可和销售软件副本，包括商业使用。软件副本或实质性部分必须保留版权声明和许可证声明。软件按“原样”提供，不附带任何担保。
 
 许可证全文见 [LICENSE](LICENSE)。
 
@@ -612,7 +665,7 @@ A: 后端会在首次启动时自动创建所有表，检查日志确认初始�
 
 ```bash
 cd backend && npm run typecheck
-cd ../frontend && npm run build
+cd ../frontend-react && npm run build
 ```
 
 ---

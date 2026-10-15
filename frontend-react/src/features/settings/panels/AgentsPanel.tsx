@@ -2,14 +2,14 @@
  * Agent 配置面板：左侧 4 个 agent 列表；右侧 System Prompt / Skills 子面板。
  * prompt/skill 编辑语言只读跟随内容语言（qk.contentLanguage）。
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronDown, FileText, Loader2, Plus, Trash2 } from 'lucide-react'
 import { qk } from '@/shared/api/query-keys'
 import { settingsApi } from '@/entities/settings/api'
-import { promptApi, skillsApi, type PromptSummary, type SkillSummary } from '@/entities/ai-config/workspace-api'
+import { promptApi, skillsApi, type PromptDetail, type PromptSummary, type SkillSummary } from '@/entities/ai-config/workspace-api'
 import { toastError } from '@/shared/lib/errors'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
@@ -27,6 +27,9 @@ const AGENT_DEFS = [
 ] as const
 
 type AgentType = (typeof AGENT_DEFS)[number]['type']
+type PromptDraft = { value: string; remote: string | null }
+type PromptSave = { agent: AgentType; lang: string; name: string; value: string }
+const promptKeyOf = (agent: string, lang: string) => `${agent}:${lang}`
 
 // settings-scroll 直接子元素限宽居中
 const CONTENT_W = 'mx-auto w-full max-w-[1080px]'
@@ -136,28 +139,51 @@ export function AgentsPanel() {
     // 服务端失败不阻塞面板
     retry: false,
   })
-  const [promptDraft, setPromptDraft] = useState('')
-  // 后台刷新不覆盖 dirty 草稿：仅当草稿与上一个服务端值一致（无本地编辑）或首次加载时跟随远端
-  const lastRemotePromptRef = useRef<string | null>(null)
+  // 每个 Agent / 语言持有独立草稿，切换与异步响应不会把提示词串到另一个配置。
+  const promptKey = promptKeyOf(selectedAgent, qLang)
+  const [promptDrafts, setPromptDrafts] = useState<Record<string, PromptDraft>>({})
+  const promptDraft = promptDrafts[promptKey]?.value ?? promptDetailQuery.data?.system_prompt ?? ''
   useEffect(() => {
-    const remote = promptDetailQuery.data?.system_prompt ?? ''
-    setPromptDraft((prev) => (lastRemotePromptRef.current === null || prev === lastRemotePromptRef.current ? remote : prev))
-    lastRemotePromptRef.current = remote
-  }, [promptDetailQuery.data])
+    if (!promptDetailQuery.data) return
+    const remote = promptDetailQuery.data.system_prompt
+    setPromptDrafts((previous) => {
+      const draft = previous[promptKey]
+      if (draft?.remote === remote) return previous
+      return {
+        ...previous,
+        [promptKey]: { value: !draft || draft.value === draft.remote ? remote : draft.value, remote },
+      }
+    })
+  }, [promptKey, promptDetailQuery.data])
+
+  function setPromptDraft(value: string) {
+    setPromptDrafts((previous) => ({
+      ...previous,
+      [promptKey]: { value, remote: previous[promptKey]?.remote ?? promptDetailQuery.data?.system_prompt ?? null },
+    }))
+  }
 
   const agentPromptFallback = editLang !== 'zh' && !!promptDetailQuery.data?.is_default
 
   const savePromptMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: ({ agent, name, value, lang }: PromptSave) =>
       promptApi.update(
-        selectedAgent,
-        { name: selectedDef.label, system_prompt: promptDraft },
-        editLang !== 'zh' ? editLang : undefined,
+        agent,
+        { name, system_prompt: value },
+        lang !== 'zh' ? lang : undefined,
       ),
-    onSuccess: () => {
-      toast.success(t('settings.agents.saved', { agent: selectedDef.label }))
-      void queryClient.invalidateQueries({ queryKey: qk.prompts(qLang) })
-      void queryClient.invalidateQueries({ queryKey: qk.promptDetail(selectedAgent, qLang) })
+    onSuccess: (_result, saved) => {
+      const key = promptKeyOf(saved.agent, saved.lang)
+      setPromptDrafts((previous) => ({
+        ...previous,
+        [key]: { value: previous[key]?.value ?? saved.value, remote: saved.value },
+      }))
+      queryClient.setQueryData<PromptDetail>(qk.promptDetail(saved.agent, saved.lang), (previous) =>
+        previous ? { ...previous, system_prompt: saved.value, is_default: false } : previous,
+      )
+      toast.success(t('settings.agents.saved', { agent: saved.name }))
+      void queryClient.invalidateQueries({ queryKey: qk.prompts(saved.lang) })
+      void queryClient.invalidateQueries({ queryKey: qk.promptDetail(saved.agent, saved.lang) })
     },
     onError: (err) => toastError(err),
   })
@@ -165,9 +191,13 @@ export function AgentsPanel() {
   async function resetAgentPrompt() {
     try {
       await promptApi.reset(selectedAgent, editLang !== 'zh' ? editLang : undefined)
-      lastRemotePromptRef.current = null
+      const resetPrompt = await promptApi.get(selectedAgent, editLang !== 'zh' ? editLang : undefined)
+      setPromptDrafts((previous) => ({
+        ...previous,
+        [promptKey]: { value: resetPrompt.system_prompt, remote: resetPrompt.system_prompt },
+      }))
+      queryClient.setQueryData(qk.promptDetail(selectedAgent, qLang), resetPrompt)
       await queryClient.invalidateQueries({ queryKey: qk.prompts(qLang) })
-      await queryClient.invalidateQueries({ queryKey: qk.promptDetail(selectedAgent, qLang) })
       toast.success(t('settings.agents.promptReset'))
     } catch (err) {
       toastError(err)
@@ -356,8 +386,8 @@ export function AgentsPanel() {
                   variant="primary"
                   size="sm"
                   className="ml-auto"
-                  disabled={savePromptMutation.isPending}
-                  onClick={() => savePromptMutation.mutate()}
+                  disabled={savePromptMutation.isPending || !promptDetailQuery.data}
+                  onClick={() => savePromptMutation.mutate({ agent: selectedAgent, lang: qLang, name: selectedDef.label, value: promptDraft })}
                 >
                   {savePromptMutation.isPending && <Loader2 size={12} className="animate-spin" />}
                   {t('common.save')}

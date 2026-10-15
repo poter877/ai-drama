@@ -1,5 +1,5 @@
 {
-  "name": "server",
+  "name": "video-factory-backend",
   "version": "1.0.0",
   "description": "",
   "main": "src/index.ts",
@@ -12,7 +12,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "CC BY-NC-SA-4.0",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@ai-sdk/google": "^3.0.53",
@@ -28,6 +28,7 @@
     "hono": "^4.12.9",
     "pino": "^10.3.1",
     "sharp": "^0.34.5",
+    "three": "^0.183.2",
     "uuid": "^13.0.0",
     "zod": "^4.3.6"
   },

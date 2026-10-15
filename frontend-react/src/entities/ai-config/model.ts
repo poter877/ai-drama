@@ -2,7 +2,8 @@
 import { api, qs } from '@/shared/api/client'
 import { asArray, asRecord, field } from '@/shared/api/dto'
 
-export type ServiceType = 'text' | 'image' | 'video'
+/** Capability names are supplied by the backend tool catalog as adapters are added. */
+export type ServiceType = string
 
 export interface AiConfig {
   id: number
@@ -10,7 +11,8 @@ export interface AiConfig {
   provider: string
   name: string
   baseUrl: string
-  /** 列表契约治理前，后端仍可能返回明文；本字段不得写入日志/持久化 */
+  /** 密钥仅用于提交，不从服务端读取。 */
+  hasApiKey?: boolean
   apiKey: string
   models: string[]
   endpoint: string
@@ -19,6 +21,7 @@ export interface AiConfig {
   isDefault: boolean
   isActive: boolean
   temperature: number | null
+  serviceOptions?: Record<string, unknown>
   createdAt: string
   updatedAt: string
 }
@@ -45,7 +48,8 @@ export function mapAiConfig(raw: unknown): AiConfig {
     provider: String(field(o, 'provider') ?? ''),
     name: String(field(o, 'name') ?? ''),
     baseUrl: String(field(o, 'base_url') ?? ''),
-    apiKey: String(field(o, 'api_key') ?? ''),
+    apiKey: '',
+    hasApiKey: !!field(o, 'has_api_key'),
     models: modelList,
     endpoint: String(field(o, 'endpoint') ?? ''),
     queryEndpoint: String(field(o, 'query_endpoint') ?? ''),
@@ -53,12 +57,14 @@ export function mapAiConfig(raw: unknown): AiConfig {
     isDefault: !!field(o, 'is_default'),
     isActive: !!field(o, 'is_active'),
     temperature: (field(o, 'temperature') as number | null) ?? null,
+    serviceOptions: asRecord(field(o, 'service_options')),
     createdAt: String(field(o, 'created_at') ?? ''),
     updatedAt: String(field(o, 'updated_at') ?? ''),
   }
 }
 
 export interface ConfigTestResult {
+  checked?: 'configuration'
   ok: boolean
   reachable: boolean
   status?: number

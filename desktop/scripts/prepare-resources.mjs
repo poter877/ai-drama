@@ -1,7 +1,7 @@
 /**
  * 打包资源准备 — 组装 desktop/resources/（electron-builder extraResources 的来源）
  *
- * 1. frontend/           ← nuxt generate 产物（.output/public，含 index.html）
+ * 1. frontend/           ← React/Vite 产物（frontend-react/dist，含 index.html）
  * 2. workspace-template/ ← backend/workspace（skills + prompts，首启动拷入 userData）
  * 3. bin-<os>/           ← ffmpeg/ffprobe 按平台分目录（electron-builder ${os} 宏各取所需，
  *                          避免 mac 包带 exe、win 包带 mac 二进制白白 +144MB）
@@ -16,15 +16,14 @@ const DESKTOP = path.resolve(__dirname, '..')
 const REPO = path.resolve(DESKTOP, '..')
 const RES = path.join(DESKTOP, 'resources')
 
-fs.rmSync(RES, { recursive: true, force: true })
-fs.mkdirSync(RES, { recursive: true })
-
 // 1. 前端静态产物
-const frontendSrc = path.join(REPO, 'frontend', '.output', 'public')
+const frontendSrc = path.join(REPO, 'frontend-react', 'dist')
 if (!fs.existsSync(path.join(frontendSrc, 'index.html'))) {
-  console.error('缺少前端产物：请先在 frontend/ 执行 npm run generate')
+  console.error('缺少 React 前端产物：请先在仓库根目录执行 npm run build:frontend')
   process.exit(1)
 }
+fs.rmSync(RES, { recursive: true, force: true })
+fs.mkdirSync(RES, { recursive: true })
 fs.cpSync(frontendSrc, path.join(RES, 'frontend'), { recursive: true })
 console.log('resources/frontend ✓')
 
@@ -37,8 +36,8 @@ console.log('resources/workspace-template ✓')
 //    Windows 交叉打包：ffmpeg.exe 从 ffmpeg-static GitHub release 获取（本地缓存），
 //    ffprobe.exe 直接用 ffprobe-static 自带的 win32/x64 产物）
 const req = createRequire(import.meta.url)
-const binMac = path.join(RES, 'bin-mac')
-const binWin = path.join(RES, 'bin-win')
+const binMac = path.join(RES, 'bin-darwin')
+const binWin = path.join(RES, 'bin-win32')
 fs.mkdirSync(binMac, { recursive: true })
 fs.mkdirSync(binWin, { recursive: true })
 const ffmpegPath = req('ffmpeg-static')
@@ -51,7 +50,7 @@ fs.copyFileSync(ffmpegPath, path.join(binMac, 'ffmpeg'))
 fs.copyFileSync(ffprobePath, path.join(binMac, 'ffprobe'))
 fs.chmodSync(path.join(binMac, 'ffmpeg'), 0o755)
 fs.chmodSync(path.join(binMac, 'ffprobe'), 0o755)
-console.log('resources/bin-mac ✓')
+console.log('resources/bin-darwin ✓')
 
 // 3b. Windows 二进制（打 win 包用；不打 win 包时缺失不报错，仅提示）
 const winBinDir = path.join(DESKTOP, 'build', 'win-bin')
@@ -64,5 +63,5 @@ if (!fs.existsSync(ffmpegWin)) {
 if (fs.existsSync(ffmpegWin) && fs.existsSync(ffprobeWinSrc)) {
   fs.copyFileSync(ffmpegWin, path.join(binWin, 'ffmpeg.exe'))
   fs.copyFileSync(ffprobeWinSrc, path.join(binWin, 'ffprobe.exe'))
-  console.log('resources/bin-win ✓')
+  console.log('resources/bin-win32 ✓')
 }

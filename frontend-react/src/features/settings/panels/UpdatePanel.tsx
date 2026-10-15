@@ -169,7 +169,7 @@ export function UpdatePanel() {
               {/* 服务器手动模式：无 Watchtower，给出更新命令 */}
               {!desktopBridge && serverUpdateMode === 'manual' && (
                 <div className={CONFIG_SUB}>
-                  {t('settings.about.serverManualHint')} <span className="font-code">docker compose pull && docker compose up -d</span>
+                  {t('settings.about.serverManualHint')} <span className="font-code">docker compose up -d --build</span>
                 </div>
               )}
             </div>

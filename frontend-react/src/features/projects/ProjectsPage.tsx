@@ -1,5 +1,6 @@
+import { useCreativeCatalog, useCatalogText } from '@/entities/creative/catalog'
 /**
- * 项目启动台（旧 pages/index.vue）：列表、筛选、排序、创建、删除、手动状态标记。
+ * 项目启动台：列表、筛选、排序、创建、删除、手动状态标记。
  * 服务端数据经 React Query；状态标记为乐观更新（失败回滚）。
  * 样式已迁移 Tailwind（ProjectsPage.module.css 已删除）；
  * `.head-actions` 与 data-tour 属性保留为引导锚点。
@@ -14,7 +15,7 @@ import { dramaQueries } from '@/entities/drama/queries'
 import { dramaApi } from '@/entities/drama/api'
 import { qk } from '@/shared/api/query-keys'
 import { stylePresetApi, type StylePreset } from '@/entities/settings/api'
-import type { Drama } from '@/entities/drama/model'
+import { projectPath, type Drama, type ProjectType } from '@/entities/drama/model'
 import { toastError } from '@/shared/lib/errors'
 import { relativeTime } from '@/shared/lib/format'
 import { autoTour, startTour, type TourStep } from '@/shared/lib/tour'
@@ -42,6 +43,8 @@ const filterChipClass =
 
 export function ProjectsPage() {
   const { t } = useTranslation()
+  const catalog = useCreativeCatalog()
+  const localize = useCatalogText()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -67,6 +70,7 @@ export function ProjectsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [projectTypeFilter, setProjectTypeFilter] = useState<'all' | ProjectType>('all')
   const [sortMode, setSortMode] = useState('updated')
   const [statusMenuId, setStatusMenuId] = useState<number | null>(null)
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null)
@@ -143,7 +147,7 @@ export function ProjectsPage() {
       const text = [d.title, d.style, styleLabel(d.style), statusLabel].filter(Boolean).join(' ').toLowerCase()
       const matchesSearch = !keyword || text.includes(keyword)
       const matchesStatus = statusFilter === 'all' || currentStatus(d) === statusFilter
-      return matchesSearch && matchesStatus
+      return matchesSearch && matchesStatus && (projectTypeFilter === 'all' || d.projectType === projectTypeFilter)
     })
     return [...items].sort((a, b) => {
       if (sortMode === 'title') return String(a.title || '').localeCompare(String(b.title || ''), 'zh-CN')
@@ -151,7 +155,7 @@ export function ProjectsPage() {
     })
     // styleLabel 依赖 stylePresets（随查询数据更新）
      
-  }, [dramas, searchKeyword, statusFilter, sortMode, stylePresets, statusOptions])
+  }, [dramas, searchKeyword, statusFilter, projectTypeFilter, sortMode, stylePresets, statusOptions])
 
   useEffect(() => {
     const timer = setTimeout(() => autoTour('index', INDEX_TOUR), 600)
@@ -189,6 +193,15 @@ export function ProjectsPage() {
         </div>
       </div>
 
+      <div className="mb-4 flex gap-2" role="group" aria-label={t('index.createDialog.projectType')}>
+        {(['all', 'drama', 'creative'] as const).map(type => (
+          <button key={type} type="button" aria-pressed={projectTypeFilter === type}
+            className={cn(filterChipClass, projectTypeFilter === type && 'bg-brand-soft text-brand-content')}
+            onClick={() => setProjectTypeFilter(type)}>
+            {t(type === 'all' ? 'index.allProjects' : `index.createDialog.${type}Title`)}
+          </button>
+        ))}
+      </div>
       <div className="mb-4 flex items-center gap-3 max-760:flex-wrap">
         <label className="relative w-60 shrink-0 max-760:w-full max-760:flex-1">
           <svg
@@ -255,11 +268,12 @@ export function ProjectsPage() {
               tabIndex={0}
               role="button"
               aria-label={t('index.openProjectAria', { title: d.title })}
-              onClick={() => navigate(`/drama/${d.id}`)}
+              onClick={() => navigate(projectPath(d))}
               onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
-                  navigate(`/drama/${d.id}`)
+                  navigate(projectPath(d))
                 }
               }}
             >
@@ -328,7 +342,7 @@ export function ProjectsPage() {
                       </IconButton>
                     )}
                   >
-                    <AppMenuItem onClick={() => { setActiveMenuId(null); navigate(`/drama/${d.id}`) }}>
+                    <AppMenuItem onClick={() => { setActiveMenuId(null); navigate(projectPath(d)) }}>
                       {t('index.openProject')}
                     </AppMenuItem>
                     <AppMenuItem danger onClick={() => { setActiveMenuId(null); setDramaToDelete(d) }}>
@@ -340,9 +354,12 @@ export function ProjectsPage() {
               <div className="px-3.5 pt-3 pb-[13px]">
                 <h2 className="truncate m-0 text-sm font-semibold tracking-[-0.01em] text-content">{d.title}</h2>
                 <div className="mt-[7px] flex flex-wrap items-center gap-2 text-[11.5px]">
+                  <Badge>{t(`index.createDialog.${d.projectType || 'drama'}Title`)}</Badge>
                   {d.style && <Badge tone="brand">{styleLabel(d.style)}</Badge>}
                   <span className="text-content-subtle">
-                    {t('index.projectMeta', { chars: d.characters.length, scenes: d.scenes.length, eps: d.episodes.length })}
+                    {d.projectType === 'creative'
+                      ? localize(catalog.data?.find(item => item.id === d.creativeCategory)?.title) || (['product', 'montage'].includes(d.creativeCategory ?? '') ? t(`index.createDialog.categories.${d.creativeCategory}.title`) : d.creativeCategory)
+                      : t('index.projectMeta', { chars: d.characters.length, scenes: d.scenes.length, eps: d.episodes.length })}
                   </span>
                 </div>
                 <div className="text-content-subtle mt-2.5 flex items-center gap-1 text-micro whitespace-nowrap">
@@ -381,13 +398,13 @@ export function ProjectsPage() {
         onClose={() => setShowCreate(false)}
         stylePresets={stylePresets}
         aspectRatioOptions={aspectRatioOptions}
-        onCreated={(id) => navigate(`/drama/${id}`)}
+        onCreated={(id, projectType) => navigate(projectPath({ id, projectType }))}
       />
 
       <ConfirmDialog
         open={!!dramaToDelete}
         title={t('index.deleteDialog.title')}
-        message={t('index.deleteDialog.message', { title: dramaToDelete?.title })}
+        message={t(dramaToDelete?.projectType === 'creative' ? 'index.deleteDialog.creativeMessage' : 'index.deleteDialog.message', { title: dramaToDelete?.title })}
         loading={deleteMutation.isPending}
         onConfirm={() => dramaToDelete && deleteMutation.mutate(dramaToDelete.id)}
         onCancel={() => setDramaToDelete(null)}

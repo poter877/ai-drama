@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "Huobao Shorts",
+    "title": "Video Factory",
     "updateAvailable": "New version v{version} is available. Upgrade in Settings → About."
   },
   "common": {
@@ -96,7 +96,7 @@
   "index": {
     "hero": {
       "title": "Project Launcher",
-      "sub": "From an idea to a short drama — AI does the whole pipeline for you",
+      "sub": "Turn an idea into your next video",
       "projectCount": "{n} projects",
       "activeCount": "{n} active",
       "styleCount": "{n} visual styles"
@@ -113,8 +113,8 @@
     "projectMeta": "{chars} characters · {scenes} scenes · {eps} episodes",
     "emptyFilteredTitle": "No matching projects",
     "emptyFilteredDesc": "Adjust the search term or filters.",
-    "emptyTitle": "Create your first drama project",
-    "emptyDesc": "Pick an episode to start producing after creation.",
+    "emptyTitle": "Create your first video project",
+    "emptyDesc": "Create a drama or creative video to start your first production.",
     "deleted": "Deleted",
     "noEpisodes": "No episodes yet",
     "episodeN": "Episode {n}",
@@ -132,7 +132,7 @@
     },
     "createDialog": {
       "title": "New Project",
-      "desc": "Pick an episode on the project page after creation",
+      "desc": "Choose a project type and start creating",
       "name": "Project name",
       "namePlaceholder": "e.g. Urban romance drama “The Time Post Office”",
       "style": "Visual style",
@@ -140,18 +140,46 @@
       "aspectRatio": "Aspect ratio",
       "aspectRatioPlaceholder": "Select aspect ratio",
       "aspectRatioHint": "Fixed after creation; all videos will use this ratio",
-      "submit": "Create project"
+      "submit": "Create project",
+      "projectType": "Project type",
+      "dramaTitle": "Drama project",
+      "dramaDescription": "Create an ongoing story with scripts, characters, and episodes",
+      "creativeTitle": "Creative video",
+      "creativeDescription": "Create stories, promos and presentations, or repurpose existing media",
+      "creativeCategory": "Video type",
+      "creativeNamePlaceholder": "e.g. Black holes explained in one minute",
+      "creativeSetupHint": "Create to open the creative video workspace, plan your shots, produce media, and export.",
+      "categories": {
+        "explainer": {
+          "title": "Explainer",
+          "description": "Explain a topic with visuals, narration, and captions"
+        },
+        "product": {
+          "title": "Product promo",
+          "description": "Showcase a product with your assets and key selling points"
+        },
+        "cinematic": {
+          "title": "Cinematic short",
+          "description": "Turn an idea into a trailer or visual short"
+        },
+        "montage": {
+          "title": "Video montage",
+          "description": "Combine existing footage with audio and captions"
+        }
+      }
     },
     "deleteDialog": {
       "title": "Delete project",
-      "message": "Delete “{title}”? Episodes, storyboards and generation records will be removed. This cannot be undone."
+      "message": "Delete “{title}”? Episodes, storyboards and generation records will be removed. This cannot be undone.",
+      "creativeMessage": "Delete “{title}”? Its creative plan, conversation, and export history will no longer be accessible."
     },
     "time": {
       "justNow": "Just now",
       "minutesAgo": "{n} min ago",
       "hoursAgo": "{n} h ago",
       "daysAgo": "{n} d ago"
-    }
+    },
+    "allProjects": "All projects"
   },
   "detail": {
     "head": {
@@ -350,7 +378,7 @@
       "serverApply": "Update now",
       "serverApplyStarted": "Update triggered: Watchtower will pull the new image and recreate the container. Refresh in a few minutes.",
       "serverApplyFailed": "Failed to trigger update",
-      "serverManualHint": "Server deployment: run this in the deploy directory:",
+      "serverManualHint": "Server deployment: update the source checkout, then run in the deploy directory:",
       "serverNote": "Note: with Watchtower configured, Docker deployments can update in one click (pulls the new image and recreates the container); otherwise run the command shown above manually."
     },
     "agents": {
@@ -879,7 +907,7 @@
     "helpTitle": "Guide",
     "index": {
       "welcome": {
-        "title": "👋 Welcome to Huobao Drama",
+        "title": "👋 Welcome to Video Factory",
         "desc": "Novel → script → assets → storyboard → video → final cut, all in one place. Configure AI services first, then create your first project."
       },
       "create": {

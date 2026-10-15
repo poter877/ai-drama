@@ -32,7 +32,7 @@ const ffprobePath = process.env.FFPROBE_BIN || resolveStatic('ffprobe-static')
 if (ffmpegPath) ffmpeg.setFfmpegPath(ffmpegPath)
 if (ffprobePath) ffmpeg.setFfprobePath(ffprobePath)
 
-export { ffmpeg }
+export { ffmpeg, ffmpegPath, ffprobePath }
 
 /** spawn 一次 -version 验证二进制真实可执行（含同步 EFTYPE 兜底） */
 function probeBinary(binPath: string | null): Promise<boolean> {
@@ -45,8 +45,8 @@ function probeBinary(binPath: string | null): Promise<boolean> {
       clearTimeout(timer)
       resolve(ok)
     }
-    const timer = setTimeout(() => finish(false), 10_000)
-    let child
+    let child: ReturnType<typeof spawn> | undefined
+    const timer = setTimeout(() => { child?.kill('SIGKILL'); finish(false) }, 10_000)
     try {
       child = spawn(binPath, ['-version'], { stdio: 'ignore', windowsHide: true })
     } catch {

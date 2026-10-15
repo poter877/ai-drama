@@ -10,7 +10,7 @@ test('MiniMax image and video provider surfaces are removed', () => {
   const ai = read('backend/src/services/ai.ts')
   const route = read('backend/src/routes/aiConfigs.ts')
   const registry = read('backend/src/services/adapters/registry.ts')
-  const settings = read('frontend/app/pages/settings.vue')
+  const settings = read('frontend-react/src/features/settings/panels/AiConfigsPanel.tsx')
   const readme = read('README.md')
 
   assert.doesNotMatch(ai, /minimax/i)

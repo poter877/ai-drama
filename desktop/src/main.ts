@@ -36,6 +36,9 @@ let backendRestarting = false
 let backendPort = 0
 let currentDataDir = ''
 
+app.setName('视频工厂')
+
+// 保留旧版目录名，改名后继续读取已有项目和配置。
 // userData 显式按模式区分：打包版 / dev 版互不干扰（数据库、上传文件、单实例锁均隔离），
 // 不依赖 package.json 命名（打包后与 dev 同名会导致单实例锁误杀）
 app.setPath('userData', path.join(
@@ -196,7 +199,7 @@ function startBackend(): void {
     backend = null
     // 迁移/重启期间的退出是预期行为，由调用方接管
     if (!quitting && !backendRestarting) {
-      dialog.showErrorBox('火宝短剧', `后台服务异常退出（code ${code}），应用即将关闭。请重新启动。`)
+      dialog.showErrorBox('视频工厂', `后台服务异常退出（code ${code}），应用即将关闭。请重新启动。`)
       app.quit()
     }
   })
@@ -208,7 +211,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-    title: '火宝短剧',
+    title: '视频工厂',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -259,7 +262,7 @@ async function bootstrap() {
 
     currentFrontendDist = app.isPackaged
       ? path.join(resources, 'frontend')
-      : path.join(REPO_ROOT, 'frontend', '.output', 'public')
+      : path.join(REPO_ROOT, 'frontend-react', 'dist')
 
     startBackend()
     await waitHealthy(backendPort)
@@ -267,7 +270,7 @@ async function bootstrap() {
     await createWindow()
   } catch (err) {
     console.error('[main] 启动失败:', err)
-    dialog.showErrorBox('火宝短剧', `启动失败：\n${(err as Error)?.message || err}`)
+    dialog.showErrorBox('视频工厂', `启动失败：\n${(err as Error)?.message || err}`)
     app.quit()
   }
 }

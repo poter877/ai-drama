@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1
 
-# ===== 前端构建：Nuxt generate 产出静态站点 =====
+# ===== 前端构建：React + Vite 产出静态站点 =====
 FROM node:22-bookworm-slim AS frontend-build
-WORKDIR /build/frontend
-COPY frontend/package.json frontend/package-lock.json ./
+WORKDIR /build/frontend-react
+COPY frontend-react/package.json frontend-react/package-lock.json ./
 # lockfile 的 resolved 可能指向带鉴权的私有 registry（开发者本机 .npmrc），镜像内会 401。
 # 构建期删除 resolved 字段（integrity 校验不受影响），让 npm 统一走公共 registry
 RUN node -e "const fs=require('fs');const l=JSON.parse(fs.readFileSync('package-lock.json'));for(const p of Object.values(l.packages||{}))delete p.resolved;fs.writeFileSync('package-lock.json',JSON.stringify(l,null,2))" \
   && npm ci --no-audit --no-fund --registry=https://registry.npmjs.org
-COPY frontend/ ./
-RUN npm run generate
+COPY frontend-react/ ./
+RUN npm run build
 
 # ===== 后端构建：安装依赖（含原生模块编译） =====
 FROM node:22-bookworm AS backend-build
@@ -24,6 +24,8 @@ RUN npm prune --omit=dev && npm i tsx@^4.21.0 --no-save --no-audit --no-fund --r
 
 # ===== 运行时 =====
 FROM node:22-bookworm-slim
+LABEL org.opencontainers.image.title="视频工厂" \
+      org.opencontainers.image.licenses="MIT"
 ARG HUOBAO_VERSION=dev
 ENV NODE_ENV=production \
     HUOBAO_VERSION=${HUOBAO_VERSION} \
@@ -41,13 +43,14 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY LICENSE ./LICENSE
 COPY --from=backend-build /build/backend/src ./backend/src
 COPY --from=backend-build /build/backend/node_modules ./backend/node_modules
 COPY --from=backend-build /build/backend/package.json ./backend/package.json
 COPY --from=backend-build /build/backend/tsconfig.json ./backend/tsconfig.json
 # workspace 模板（skills/prompts），entrypoint copy-once 到数据卷后可在线编辑
 COPY backend/workspace ./workspace-template
-COPY --from=frontend-build /build/frontend/.output/public ./frontend-dist
+COPY --from=frontend-build /build/frontend-react/dist ./frontend-dist
 COPY docker/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh && mkdir -p /app/data
 

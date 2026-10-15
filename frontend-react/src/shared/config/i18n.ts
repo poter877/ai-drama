@@ -1,8 +1,8 @@
 /**
- * i18n（i18next + react-i18next）— 复用旧前端四语言词库（各 751 条）。
- * - vue-i18n 的 {name} 命名插值经 interpolation.prefix/suffix 直接兼容
+ * i18n（i18next + react-i18next）— 四语言词库与偏好持久化。
+ * - {name} 命名插值由 interpolation.prefix/suffix 解析
  * - 词库中的 {'@'} 字面量转义已在复制时还原为 @
- * - keySeparator '.' 与 vue-i18n 嵌套 JSON 结构一致；fallback zh 与旧行为一致
+ * - keySeparator '.' 解析嵌套 JSON；默认回退中文
  * - escapeValue false：React 渲染默认转义，无需二次处理
  */
 import i18next, { type i18n as I18nInstance } from 'i18next'

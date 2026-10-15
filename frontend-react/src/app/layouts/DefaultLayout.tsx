@@ -58,16 +58,16 @@ export function DefaultLayout() {
           >
             <div className="flex size-8 items-center justify-center overflow-hidden rounded-[9px]">
               {showBrandImage ? (
-                <img src={brandLogo} alt="火宝短剧" className="block size-7 object-contain" onError={() => setShowBrandImage(false)} />
+                <img src={brandLogo} alt={t('app.title')} className="block size-7 object-contain" onError={() => setShowBrandImage(false)} />
               ) : (
-                <span className="text-[15px] leading-none font-bold text-content">火</span>
+                <span className="text-[15px] leading-none font-bold text-content">视</span>
               )}
             </div>
             <div className="flex flex-col items-start leading-[1.15]">
               <span className="bg-brand-gradient bg-clip-text text-[15px] font-bold tracking-[-0.01em] text-transparent">
-                火宝短剧
+                {t('app.title')}
               </span>
-              <span className="mt-px text-[10px] font-normal tracking-[0.04em] text-content-subtle">Huobao Shorts</span>
+              <span className="mt-px text-[10px] font-normal tracking-[0.04em] text-content-subtle">Video Factory</span>
             </div>
           </Link>
         </div>

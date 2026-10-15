@@ -1,10 +1,10 @@
 /**
- * 项目详情页（旧 views/drama/detail.vue）：集 CRUD、分辨率/状态手动标记、
+ * 项目详情页：集 CRUD、分辨率/状态手动标记、
  * 素材库（生图受理 + 轮询回写）、素材编辑与最终提示词、图片查看器。
  * 数据经 React Query；生图等待期以 refetchInterval 轮询项目详情，图片回写后自动收敛。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -24,6 +24,7 @@ import { AppMenu } from '@/shared/ui/AppMenu'
 import { AppMenuItem } from '@/shared/ui/AppMenuItem'
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
 import { Modal } from '@/shared/ui/Modal'
+import { ImageViewer } from '@/shared/ui/media-viewers'
 import { buttonVariants } from '@/shared/ui/button'
 import { Badge, badgeVariants } from '@/shared/ui/badge'
 import { cardVariants } from '@/shared/ui/card'
@@ -163,26 +164,18 @@ const ASSET_FOOT = 'flex items-center gap-1 py-[7px] px-[11px] border-t border-o
 const PROP_NAME_ROW = 'flex items-center justify-between gap-2'
 const DOT = 'w-[7px] h-[7px] rounded-full bg-sunken shrink-0'
 
-const VIEWER_OVERLAY =
-  'fixed inset-0 z-[100] flex items-center justify-center bg-scrim backdrop-blur-[8px] animate-fade-in'
-const VIEWER_DIALOG =
-  'flex flex-col max-h-[calc(100vh_-_96px)] rounded-dialog bg-surface shadow-dialog animate-scale-in overflow-hidden w-[min(960px,calc(100vw_-_48px))] p-[14px]'
-
 /* 原 .seg/.seg-item/.on（旧全局类）的 Tailwind 等价串 */
 const SEG_ITEM =
   'cursor-pointer rounded-pill border-none bg-transparent px-4 py-[7px] text-[12.5px] font-semibold leading-none text-content-muted transition-all duration-150 ease-app hover:text-content focus-visible:outline-none focus-visible:shadow-focus'
 const SEG_ITEM_ON = 'bg-seg-active text-content shadow-[0_1px_4px_rgba(0,0,0,0.12)]'
-const VIEWER_HEAD = 'flex items-center justify-between gap-3 mb-2.5'
-const VIEWER_TITLE = 'text-[13px] font-semibold text-content-secondary'
-const VIEWER_IMG = 'w-full max-h-[76vh] object-contain rounded-control bg-elevated block'
 
 const MAT_DETAIL_TITLE_BLOCK = 'min-w-0 flex flex-col gap-1'
 const MAT_DETAIL_KICKER = 'text-content-subtle text-[10px] font-extrabold tracking-[0.12em] uppercase'
 const MAT_DETAIL_TITLE = 'm-0 text-content text-[18px] leading-[1.2] font-display'
-const MAT_DETAIL_SECONDARY_ACTIONS = 'flex items-center gap-2'
-const MAT_DETAIL_PRIMARY_ACTIONS = 'flex items-center gap-2'
-const MAT_DETAIL_SHELL = 'grid grid-cols-[minmax(280px,380px)_minmax(0,1fr)] gap-[14px] items-start'
-const MAT_DETAIL_PREVIEW_PANEL = 'min-w-0 flex flex-col gap-3 sticky top-0'
+const MAT_DETAIL_SECONDARY_ACTIONS = 'flex min-w-0 max-w-full flex-wrap items-center gap-2'
+const MAT_DETAIL_PRIMARY_ACTIONS = 'ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2'
+const MAT_DETAIL_SHELL = 'grid grid-cols-[minmax(280px,380px)_minmax(0,1fr)] gap-[14px] items-start max-1080:grid-cols-1'
+const MAT_DETAIL_PREVIEW_PANEL = 'min-w-0 flex flex-col gap-3 sticky top-0 max-1080:static'
 const MAT_DETAIL_EDITOR_PANEL = 'min-w-0 flex flex-col gap-3'
 const MAT_DETAIL_SECTION_TITLE =
   'min-h-6 flex items-center justify-between gap-[10px] text-content-secondary text-[12px] font-[820] tracking-[0.02em]'
@@ -611,6 +604,7 @@ export function DramaDetailPage() {
       </div>
     )
   }
+  if (drama.projectType === 'creative') return <Navigate to={`/creative/${drama.id}`} replace />
 
   const tabLabel = (v: string) =>
     v === 'all' ? t('index.status.all') : v === 'character' ? t('common.role') : v === 'scene' ? t('common.scene') : t('common.prop')
@@ -882,7 +876,7 @@ export function DramaDetailPage() {
                             tabIndex={0}
                             role="button"
                             onClick={() => openEdit(m)}
-                            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), openEdit(m))}
+                            onKeyDown={(e) => e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), openEdit(m))}
                           >
                             <div className={CHARACTER_ASSET_MAIN}>
                               <div className={CHARACTER_ASSET_OVERVIEW}>
@@ -960,7 +954,7 @@ export function DramaDetailPage() {
                             tabIndex={0}
                             role="button"
                             onClick={() => openEdit(m)}
-                            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), openEdit(m))}
+                            onKeyDown={(e) => e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), openEdit(m))}
                           >
                             <div className={cn(ASSET_COVER, ASSET_COVER_WIDE)}>
                               {m.image ? (
@@ -1088,7 +1082,7 @@ export function DramaDetailPage() {
         }
         showClose={false}
         footer={
-          <div>
+          <div className="flex min-w-0 w-full flex-wrap items-center justify-between gap-2">
             <div className={MAT_DETAIL_SECONDARY_ACTIONS}>
               <button
                 type="button"
@@ -1137,6 +1131,7 @@ export function DramaDetailPage() {
               <button
                 type="button"
                 className={MAT_DETAIL_MEDIA_FRAME}
+                aria-label={t('episode.viewer.imagePreview')}
                 disabled={!editTarget.image}
                 onClick={() => setViewer({ open: true, src: assetSrcOf(editTarget.image), title: `${editTarget.kind} · ${editTarget.name}` })}
               >
@@ -1288,22 +1283,12 @@ export function DramaDetailPage() {
       </Modal>
 
       {/* 图片查看器 */}
-      {viewer.open && (
-        <div
-          className={VIEWER_OVERLAY}
-          onClick={(e) => e.target === e.currentTarget && setViewer({ open: false, src: '', title: '' })}
-        >
-          <div className={VIEWER_DIALOG}>
-            <div className={VIEWER_HEAD}>
-              <span className={VIEWER_TITLE}>{viewer.title}</span>
-              <button type="button" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'size-[30px] min-w-[30px] min-h-[30px]')} onClick={() => setViewer({ open: false, src: '', title: '' })}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
-            <img src={viewer.src} alt={viewer.title} className={VIEWER_IMG} />
-          </div>
-        </div>
-      )}
+      <ImageViewer
+        open={viewer.open}
+        src={viewer.src}
+        title={viewer.title}
+        onClose={() => setViewer({ open: false, src: '', title: '' })}
+      />
 
       {/* 新建集对话框 */}
       <Modal

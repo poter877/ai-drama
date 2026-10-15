@@ -1,9 +1,13 @@
-/** 新建项目弹窗：标题 + 视觉风格 + 画幅（保留旧结构规则：创建只要标题与风格） */
-import { useEffect, useState } from 'react'
+import { useCreativeCatalog, useCatalogText, useProductionText } from '@/entities/creative/catalog'
+/** 新建项目弹窗：选择项目类型后进入对应的独立制作工作台。 */
+import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { BookOpen, Check, Clapperboard, Film, Info, Layers, Package, Plus, Sparkles, type LucideIcon } from 'lucide-react'
 import { toastError } from '@/shared/lib/errors'
+import { cn } from '@/shared/lib/cn'
 import { dramaApi } from '@/entities/drama/api'
+import type { ProjectType, CreativeCategory } from '@/entities/drama/model'
 import { qk } from '@/shared/api/query-keys'
 import { Modal } from '@/shared/ui/Modal'
 import { BaseSelect } from '@/shared/ui/BaseSelect'
@@ -17,28 +21,95 @@ interface CreateProjectDialogProps {
   onClose: () => void
   stylePresets: StylePreset[]
   aspectRatioOptions: SelectOption[]
-  onCreated: (dramaId: number) => void
+  onCreated: (projectId: number, projectType: ProjectType) => void
 }
 
 const fieldClass = 'flex flex-col gap-1.5'
 const fieldLabelClass = 'text-xs font-semibold text-content-secondary'
 
+function ProjectChoice({ name, value, title, description, icon: Icon, checked, disabled, onChange }: {
+  name: string
+  value: string
+  title: string
+  description: string
+  icon: LucideIcon
+  checked: boolean
+  disabled: boolean
+  onChange: () => void
+}) {
+  const descriptionId = useId()
+
+  return (
+    <label className="relative min-w-0 cursor-pointer">
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        aria-label={title}
+        aria-describedby={descriptionId}
+        className="peer sr-only"
+      />
+      <span className={cn(
+        'flex h-full items-start gap-3 rounded-control border border-solid p-3.5 text-left transition-colors duration-150 motion-reduce:transition-none',
+        'peer-focus-visible:outline-none peer-focus-visible:shadow-focus peer-disabled:cursor-not-allowed peer-disabled:opacity-45',
+        checked ? 'border-brand bg-brand-soft' : 'border-outline-strong bg-surface hover:border-outline-hover hover:bg-hover-overlay',
+      )}>
+        <Icon size={19} strokeWidth={1.7} className={cn('mt-0.5 shrink-0', checked ? 'text-brand' : 'text-content-muted')} aria-hidden />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="text-sm font-semibold text-content">{title}</span>
+          <span id={descriptionId} className="text-xs leading-[1.6] text-content-muted">{description}</span>
+        </span>
+        <span className={cn(
+          'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-solid',
+          checked ? 'border-brand bg-brand text-on-action' : 'border-outline-strong',
+        )} aria-hidden>
+          {checked && <Check size={11} strokeWidth={3} />}
+        </span>
+      </span>
+    </label>
+  )
+}
+
 export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOptions, onCreated }: CreateProjectDialogProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const catalog = useCreativeCatalog(open)
+  const localize = useCatalogText()
+  const words = useProductionText()
+  const [categoryGroup, setCategoryGroup] = useState('all')
+  const [categorySearch, setCategorySearch] = useState('')
+  const [projectType, setProjectType] = useState<ProjectType>('drama')
+  const [creativeCategory, setCreativeCategory] = useState<CreativeCategory>('explainer')
   const [title, setTitle] = useState('')
   const [style, setStyle] = useState('')
   const [aspectRatio, setAspectRatio] = useState('16:9')
 
   const styleSelectOptions = stylePresets.map((p) => ({ label: p.name, value: p.value }))
   const selectedStyleDesc = stylePresets.find((p) => p.value === style)?.description || ''
+  const availableRatios = projectType === 'creative'
+    ? aspectRatioOptions.filter((option) => option.value !== 'adaptive')
+    : aspectRatioOptions
 
-  // 打开时重置表单；风格预设就绪且未选时补默认（与旧行为一致）
+  const filteredCategories = catalog.data?.filter(item => (categoryGroup === 'all' || item.group === categoryGroup) && `${localize(item.title)} ${localize(item.description)}`.toLowerCase().includes(categorySearch.trim().toLowerCase())) ?? []
+
+  // 只在重新打开时重置，后台预设刷新不能清空正在编辑的草稿。
   useEffect(() => {
     if (!open) return
+    setProjectType('drama')
+    setCategoryGroup('all')
+    setCategorySearch('')
+    setCreativeCategory('explainer')
     setTitle('')
-    setStyle(stylePresets[0]?.value ?? '')
+    setStyle('')
     setAspectRatio('16:9')
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    setStyle((current) => current || stylePresets[0]?.value || '')
   }, [open, stylePresets])
 
   const createMutation = useMutation({
@@ -47,11 +118,12 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
         title: title.trim(),
         style: style || undefined,
         aspect_ratio: aspectRatio,
+        ...(projectType === 'creative' ? { project_type: projectType, creative_category: creativeCategory } : {}),
       }),
     onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: qk.dramas() })
       onClose()
-      onCreated(Number((data as { id?: number })?.id))
+      onCreated(Number((data as { id?: number })?.id), projectType)
     },
     onError: (err) => toastError(err),
   })
@@ -59,8 +131,9 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
   return (
     <Modal
       open={open}
-      onOpenChange={(v) => !v && onClose()}
-      width={460}
+      onOpenChange={(v) => !v && !createMutation.isPending && onClose()}
+      width={projectType === 'creative' ? 800 : 640}
+      description={t('index.createDialog.desc')}
       title={
         <span className="flex flex-col gap-0.5">
           <span>{t('index.createDialog.title')}</span>
@@ -70,21 +143,21 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
       showClose={false}
       icon={
         <div className="flex size-10 shrink-0 items-center justify-center rounded-control bg-brand-soft text-brand">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-            <rect x="3" y="3" width="18" height="18" rx="3" />
-            <line x1="12" y1="8" x2="12" y2="16" />
-            <line x1="8" y1="12" x2="16" y2="12" />
-          </svg>
+          <Plus size={19} strokeWidth={1.8} aria-hidden />
         </div>
       }
       footer={
         <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button type="submit" form="create-project-form" variant="primary" loading={createMutation.isPending}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
+          <Button onClick={onClose} disabled={createMutation.isPending} className="shrink-0">{t('common.cancel')}</Button>
+          <Button
+            type="submit"
+            form="create-project-form"
+            variant="primary"
+            loading={createMutation.isPending}
+            disabled={projectType === 'creative' && !catalog.data?.some(item => item.id === creativeCategory)}
+            className="min-w-0 whitespace-normal text-center leading-[1.35]"
+          >
+            <Plus size={13} strokeWidth={2.2} className="shrink-0" aria-hidden />
             {t('index.createDialog.submit')}
           </Button>
         </>
@@ -92,13 +165,70 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
     >
       <form
         id="create-project-form"
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-5"
         onSubmit={(e) => {
           e.preventDefault()
-          if (!title.trim()) return
+          if (createMutation.isPending || !title.trim() || (projectType === 'creative' && !catalog.data?.some(item => item.id === creativeCategory))) return
           createMutation.mutate()
         }}
       >
+        <fieldset className="min-w-0 border-0" disabled={createMutation.isPending}>
+          <legend className={cn(fieldLabelClass, 'mb-2')}>{t('index.createDialog.projectType')}</legend>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ProjectChoice
+              name="project-type"
+              value="drama"
+              title={t('index.createDialog.dramaTitle')}
+              description={t('index.createDialog.dramaDescription')}
+              icon={Film}
+              checked={projectType === 'drama'}
+              disabled={createMutation.isPending}
+              onChange={() => setProjectType('drama')}
+            />
+            <ProjectChoice
+              name="project-type"
+              value="creative"
+              title={t('index.createDialog.creativeTitle')}
+              description={t('index.createDialog.creativeDescription')}
+              icon={Sparkles}
+              checked={projectType === 'creative'}
+              disabled={createMutation.isPending}
+              onChange={() => {
+                setProjectType('creative')
+                if (aspectRatio === 'adaptive') setAspectRatio('16:9')
+              }}
+            />
+          </div>
+        </fieldset>
+        {projectType === 'creative' && (
+          <fieldset className="min-w-0 border-0">
+            <legend className={cn(fieldLabelClass, 'mb-2')}>{t('index.createDialog.creativeCategory')}</legend>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {(['all', 'story', 'business', 'presenter', 'reuse'] as const).map(group => <Button key={group} size="sm" aria-pressed={categoryGroup === group} disabled={createMutation.isPending} variant={categoryGroup === group ? 'primary' : 'default'} onClick={() => setCategoryGroup(group)}>{({all:words('全部类型','All types'),story:words('故事与视觉','Story & visuals'),business:words('演示与教学','Demos & tutorials'),presenter:words('讲述与出镜','Presenters'),reuse:words('素材再创作','Repurpose')})[group]}</Button>)}
+            </div>
+            <Input aria-label={words('搜索视频类型','Search video types')} placeholder={words('搜索类型、用途…','Search types and use cases…')} value={categorySearch} onChange={event => setCategorySearch(event.target.value)} disabled={createMutation.isPending} className="mb-3" />
+            <p className="mb-3 text-xs text-content-muted">{words('已选择：','Selected: ')}{localize(catalog.data?.find(item => item.id === creativeCategory)?.title)} · {catalog.data?.length ?? 0} {words('种视频类型','video types')}</p>
+            {catalog.isPending && <p role="status">{words('正在加载视频类型…','Loading video types…')}</p>}
+            {catalog.isError && <div role="alert">{words('无法加载类型，请重试','Could not load types. Retry.')}<Button onClick={() => void catalog.refetch()}>{words('重试','Retry')}</Button></div>}
+            {catalog.data && !filteredCategories.length && <p role="status" className="py-5 text-center text-sm text-content-muted">{words('没有匹配的类型，试试其他关键词或分类','No matching types. Try another search or group.')}</p>}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {filteredCategories.map((item) => (
+
+                <ProjectChoice
+                  key={item.id}
+                  name="creative-category"
+                  value={item.id}
+                  title={localize(item.title)}
+                  description={localize(item.description)}
+                  icon={item.group === 'business' ? Package : item.group === 'story' ? Clapperboard : item.group === 'presenter' ? BookOpen : Layers}
+                  checked={creativeCategory === item.id}
+                  disabled={createMutation.isPending}
+                  onChange={() => setCreativeCategory(item.id)}
+                />
+              ))}
+            </div>
+          </fieldset>
+        )}
         <label className={fieldClass}>
           <span className={fieldLabelClass}>
             {t('index.createDialog.name')} <span className="text-danger">*</span>
@@ -106,32 +236,43 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={t('index.createDialog.namePlaceholder')}
+            placeholder={t(projectType === 'drama' ? 'index.createDialog.namePlaceholder' : 'index.createDialog.creativeNamePlaceholder')}
+            disabled={createMutation.isPending}
             required
             autoFocus
           />
         </label>
-        <label className={fieldClass}>
-          <span className={fieldLabelClass}>{t('index.createDialog.style')}</span>
-          <BaseSelect
-            value={style}
-            onChange={setStyle}
-            options={styleSelectOptions}
-            placeholder={t('index.createDialog.stylePlaceholder')}
-            searchable
-          />
-          {selectedStyleDesc && <span className="text-micro leading-[1.5] text-content-subtle">{selectedStyleDesc}</span>}
-        </label>
-        <label className={fieldClass}>
-          <span className={fieldLabelClass}>{t('index.createDialog.aspectRatio')}</span>
-          <BaseSelect
-            value={aspectRatio}
-            onChange={setAspectRatio}
-            options={aspectRatioOptions}
-            placeholder={t('index.createDialog.aspectRatioPlaceholder')}
-          />
-          <span className="text-micro leading-[1.5] text-content-subtle">{t('index.createDialog.aspectRatioHint')}</span>
-        </label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className={fieldClass}>
+            <span className={fieldLabelClass}>{t('index.createDialog.style')}</span>
+            <BaseSelect
+              value={style}
+              onChange={setStyle}
+              options={styleSelectOptions}
+              placeholder={t('index.createDialog.stylePlaceholder')}
+              searchable
+              disabled={createMutation.isPending}
+            />
+            {selectedStyleDesc && <span className="text-micro leading-[1.5] text-content-subtle">{selectedStyleDesc}</span>}
+          </label>
+          <label className={fieldClass}>
+            <span className={fieldLabelClass}>{t('index.createDialog.aspectRatio')}</span>
+            <BaseSelect
+              value={aspectRatio}
+              onChange={setAspectRatio}
+              options={availableRatios}
+              placeholder={t('index.createDialog.aspectRatioPlaceholder')}
+              disabled={createMutation.isPending}
+            />
+            <span className="text-micro leading-[1.5] text-content-subtle">{t('index.createDialog.aspectRatioHint')}</span>
+          </label>
+        </div>
+        {projectType === 'creative' && (
+          <p id="creative-project-setup-hint" role="status" className="flex items-start gap-2 rounded-control bg-info-soft px-3 py-2.5 text-xs leading-[1.6] text-content-muted">
+            <Info size={15} className="mt-0.5 shrink-0 text-info" aria-hidden />
+            <span>{t('index.createDialog.creativeSetupHint')}</span>
+          </p>
+        )}
       </form>
     </Modal>
   )

@@ -31,6 +31,7 @@ const COS_KEY_PREFIX = 'huobao-drama'
 
 const pkg = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.json'), 'utf8'))
 const version = pkg.version
+const productName = pkg.productName || pkg.name
 const tag = `v${version}`
 
 const argv = process.argv.slice(2)
@@ -39,13 +40,13 @@ const notes = argOf('--notes') || ''
 const skipGh = argv.includes('--skip-gh')
 
 // 与 make-update-feed 相同的产物清单。注意 electron-builder 的 NSIS 本地产物带空格
-// （HuobaoDrama Setup X.Y.Z.exe），GitHub 服务端会规范化为点号；COS key/URL 需自行归一化
+// （<productName> Setup X.Y.Z.exe），GitHub 服务端会规范化为点号；COS key/URL 需自行归一化
 const assets = [
-  `HuobaoDrama-${version}-arm64.dmg`,
-  `HuobaoDrama-${version}.dmg`,
-  `HuobaoDrama-${version}-arm64-mac.zip`,
-  `HuobaoDrama-${version}-mac.zip`,
-  `HuobaoDrama Setup ${version}.exe`,
+  `${productName}-${version}-arm64.dmg`,
+  `${productName}-${version}.dmg`,
+  `${productName}-${version}-arm64-mac.zip`,
+  `${productName}-${version}-mac.zip`,
+  `${productName} Setup ${version}.exe`,
 ]
 // URL/COS key 使用的规范化文件名（空格 → 点号，与 GitHub 服务端一致）
 const dotName = (f) => f.replace(/ /g, '.')
@@ -122,9 +123,9 @@ console.log(`  ✓ latest.json (no-cache)`)
 const websiteRelease = {
   version,
   downloads: {
-    'darwin-arm64': `${COS_BASE_URL}/${tag}/HuobaoDrama-${version}-arm64.dmg`,
-    'darwin-x64': `${COS_BASE_URL}/${tag}/HuobaoDrama-${version}.dmg`,
-    'win32-x64': `${COS_BASE_URL}/${tag}/HuobaoDrama.Setup.${version}.exe`,
+    'darwin-arm64': `${COS_BASE_URL}/${tag}/${encodeURIComponent(`${productName}-${version}-arm64.dmg`)}`,
+    'darwin-x64': `${COS_BASE_URL}/${tag}/${encodeURIComponent(`${productName}-${version}.dmg`)}`,
+    'win32-x64': `${COS_BASE_URL}/${tag}/${encodeURIComponent(dotName(`${productName} Setup ${version}.exe`))}`,
   },
 }
 const websiteFeedPath = path.join(RELEASE, 'latest.js')

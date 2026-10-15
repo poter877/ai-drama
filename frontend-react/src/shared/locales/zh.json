@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "火宝短剧",
+    "title": "视频工厂",
     "updateAvailable": "发现新版本 v{version}，可在「设置 → 关于更新」中升级"
   },
   "common": {
@@ -37,7 +37,7 @@
       "settings": "设置"
     },
     "banner": {
-      "missing": "尚未配置{types}模型,AI 功能无法使用",
+      "missing": "尚未配置{types}模型，本地制作工具仍可使用",
       "goSettings": "前往设置"
     },
     "theme": {
@@ -96,7 +96,7 @@
   "index": {
     "hero": {
       "title": "项目启动台",
-      "sub": "从一个创意到一部短剧，AI 全流程为你代工",
+      "sub": "从一个创意到一部影片，开始你的创作",
       "projectCount": "{n} 个项目",
       "activeCount": "{n} 进行中",
       "styleCount": "{n} 种视觉风格"
@@ -113,8 +113,8 @@
     "projectMeta": "{chars} 角色 · {scenes} 场景 · {eps} 集",
     "emptyFilteredTitle": "没有匹配的项目",
     "emptyFilteredDesc": "调整搜索词或筛选条件。",
-    "emptyTitle": "新建第一个短剧项目",
-    "emptyDesc": "创建后选择集开始制作。",
+    "emptyTitle": "新建第一个视频项目",
+    "emptyDesc": "创建短剧或创意视频，开始制作第一部作品。",
     "deleted": "已删除",
     "noEpisodes": "暂无剧集",
     "episodeN": "第 {n} 集",
@@ -132,7 +132,7 @@
     },
     "createDialog": {
       "title": "新建项目",
-      "desc": "创建后进入项目页选择集",
+      "desc": "选择项目类型，开始新的创作",
       "name": "项目名称",
       "namePlaceholder": "例如：都市情感短剧《时光邮局》",
       "style": "视觉风格",
@@ -140,18 +140,46 @@
       "aspectRatio": "画面比例",
       "aspectRatioPlaceholder": "选择画面比例",
       "aspectRatioHint": "创建后固定，视频生成将统一使用该比例",
-      "submit": "创建项目"
+      "submit": "创建项目",
+      "projectType": "项目类型",
+      "dramaTitle": "短剧项目",
+      "dramaDescription": "围绕剧本、角色和分集，制作连续剧情",
+      "creativeTitle": "创意视频",
+      "creativeDescription": "制作故事、宣传、口播，或将现有素材再创作",
+      "creativeCategory": "视频类型",
+      "creativeNamePlaceholder": "例如：一分钟了解黑洞",
+      "creativeSetupHint": "创建后进入独立创意视频工作台，编写方案、制作素材并导出成片。",
+      "categories": {
+        "explainer": {
+          "title": "科普解说",
+          "description": "用画面、旁白和字幕讲清一个主题"
+        },
+        "product": {
+          "title": "产品宣传",
+          "description": "围绕产品素材和卖点制作宣传视频"
+        },
+        "cinematic": {
+          "title": "电影感短片",
+          "description": "将创意制作成预告片或视觉短片"
+        },
+        "montage": {
+          "title": "素材混剪",
+          "description": "组合已有素材，配上声音和字幕"
+        }
+      }
     },
     "deleteDialog": {
       "title": "删除项目",
-      "message": "确定删除「{title}」？项目下的剧集、分镜与生成记录将一并删除，此操作不可恢复。"
+      "message": "确定删除「{title}」？项目下的剧集、分镜与生成记录将一并删除，此操作不可恢复。",
+      "creativeMessage": "确定删除「{title}」吗？创作方案、对话和导出记录将无法继续访问。"
     },
     "time": {
       "justNow": "刚刚",
       "minutesAgo": "{n} 分钟前",
       "hoursAgo": "{n} 小时前",
       "daysAgo": "{n} 天前"
-    }
+    },
+    "allProjects": "全部项目"
   },
   "detail": {
     "head": {
@@ -350,7 +378,7 @@
       "serverApply": "立即更新",
       "serverApplyStarted": "已触发更新：Watchtower 将拉取新镜像并重建容器，请几分钟后刷新页面",
       "serverApplyFailed": "触发更新失败",
-      "serverManualHint": "服务器部署：请在部署目录执行",
+      "serverManualHint": "服务器部署：更新本地源码后，在部署目录执行",
       "serverNote": "说明：Docker 部署配置了 Watchtower 时可一键更新（拉取新镜像并重建容器）；未配置时请按提示手动执行更新命令。"
     },
     "agents": {
@@ -879,7 +907,7 @@
     "helpTitle": "使用引导",
     "index": {
       "welcome": {
-        "title": "👋 欢迎使用火宝短剧",
+        "title": "👋 欢迎使用视频工厂",
         "desc": "小说 → 剧本 → 资产 → 分镜 → 视频 → 成片，一站式 AI 短剧制作。先配置 AI 服务，再创建第一个项目。"
       },
       "create": {

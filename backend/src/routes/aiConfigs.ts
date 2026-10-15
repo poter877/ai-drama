@@ -4,10 +4,13 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { joinProviderUrl } from '../services/adapters/url.js'
-import { isOfficialProvider, parseConfigTemperature } from '../services/ai.js'
+import { isOfficialProvider, parseConfigTemperature, parseServiceOptions } from '../services/ai.js'
 import { redactUrl, logTaskError, logTaskProgress, logTaskSuccess } from '../utils/task-logger.js'
 
+import { migrateServiceConfigs, configModels, validateServiceConfig, toolServices } from '../services/ai-registry.js'
+
 const app = new Hono()
+app.use('*', async (_c, next) => { migrateServiceConfigs(); await next() })
 
 /** 归一化 temperature 入参：null=未设置；合法值 0~2；非法抛错 */
 function normalizeTemperature(v: any): number | null {
@@ -20,8 +23,10 @@ function normalizeTemperature(v: any): number | null {
 /** 把 settings JSON 中的 temperature 透出为顶层字段，便于前端直接读写 */
 function withParsedFields(r: any) {
   return {
-    ...toSnakeCase(r),
-    model: r.model ? JSON.parse(r.model) : [],
+    ...toSnakeCase({ ...r, apiKey: undefined, settings: undefined }),
+    has_api_key: !!r.apiKey,
+    service_options: parseServiceOptions(r.settings),
+    model: configModels(r.model),
     temperature: parseConfigTemperature(r.settings),
   }
 }
@@ -138,6 +143,13 @@ app.post('/', async (c) => {
     return badRequest(c, '不支持的 service_type/provider')
   }
 
+  const validation = validateServiceConfig(body.service_type, body.provider, body.base_url || '', body.model || [])
+  if (validation) return badRequest(c, validation)
+
+  const serviceOptions = body.service_options ?? {}
+  if (!serviceOptions || typeof serviceOptions !== 'object' || Array.isArray(serviceOptions) || JSON.stringify(serviceOptions).length > 100000)
+    return badRequest(c, '服务参数须为不超过100KB的JSON对象')
+  if (/"(?:api_key|apiKey|authorization|secret|secret_key|secretKey|client_secret|clientSecret|api_secret|apiSecret|access_token|accessToken|refresh_token|refreshToken|token)"\s*:/i.test(JSON.stringify(serviceOptions))) return badRequest(c, '请将服务密钥填在 API Key，不能放入服务参数')
   let temperature: number | null = null
   if ('temperature' in body) {
     try {
@@ -156,7 +168,7 @@ app.post('/', async (c) => {
     model: JSON.stringify(body.model || []),
     priority: body.priority || 0,
     isActive: true,
-    settings: temperature !== null ? JSON.stringify({ temperature }) : null,
+    settings: JSON.stringify({ ...(temperature !== null ? { temperature } : {}), serviceOptions }),
     createdAt: ts,
     updatedAt: ts,
   })
@@ -177,6 +189,18 @@ app.post('/test', async (c) => {
     return badRequest(c, '不支持的 service_type/provider')
   }
 
+  if (body.config_id && !body.api_key) {
+    const existing = db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, Number(body.config_id))).get()
+    if (!existing) return notFound(c)
+    // Never forward a stored credential to a changed endpoint or another provider.
+    if (existing.provider !== body.provider || existing.baseUrl !== body.base_url || existing.serviceType !== body.service_type)
+      return badRequest(c, '测试新的服务商或地址时，请重新填写 API Key')
+    body.api_key = existing.apiKey
+  }
+  if (!['openai','gemini','volcengine','minimax','aliyun'].includes(body.provider)) {
+    const error = validateServiceConfig(body.service_type, body.provider, body.base_url, body.model)
+    return success(c, { ok: false, reachable: false, checked: 'configuration', message: error || '配置格式已检查；此服务的认证将在实际任务中验证，未发送生成请求' })
+  }
   const model = Array.isArray(body.model) ? body.model[0] : body.model
   const probe = buildProbe(body.service_type, body.provider, body.base_url, model, body.api_key)
   const probeUrl = redactUrl(probe.url)
@@ -191,6 +215,7 @@ app.post('/test', async (c) => {
   try {
     const resp = await fetch(probe.url, {
       method: probe.method,
+      signal: AbortSignal.timeout(30000),
       headers: probe.headers,
       body: probe.body ? JSON.stringify(probe.body) : undefined,
     })
@@ -206,7 +231,7 @@ app.post('/test', async (c) => {
       message: reachable
         ? (resp.ok ? '端点可访问，认证与路径基本正常' : '端点已响应，请根据状态码判断认证或路径是否正确')
         : '端点未按预期响应，请检查 Base URL 和代理前缀',
-      response_preview: text.slice(0, 240),
+      response_preview: body.api_key ? text.split(body.api_key).join('[redacted]').slice(0, 240) : text.slice(0, 240),
     }
     if (reachable) {
       logTaskSuccess('AIConfig', 'probe-done', {
@@ -260,16 +285,29 @@ app.put('/:id', async (c) => {
     return badRequest(c, '不支持的 service_type/provider')
   }
 
+  if (serviceType !== existing.serviceType || provider !== existing.provider)
+    return badRequest(c, '已有配置不能更换服务类型或服务商，请新建配置')
+  if (body.base_url && body.base_url !== existing.baseUrl && !body.api_key)
+    return badRequest(c, '更换服务地址时，请重新填写 API Key')
+  const validation = validateServiceConfig(serviceType, provider, body.base_url ?? existing.baseUrl, body.model ?? configModels(existing.model))
+  if (validation) return badRequest(c, validation)
   const updates: Record<string, any> = { updatedAt: now() }
 
-  if ('service_type' in body) updates.serviceType = body.service_type
-  if ('provider' in body) updates.provider = body.provider
   if ('name' in body) updates.name = body.name
   if ('base_url' in body) updates.baseUrl = body.base_url
-  if ('api_key' in body) updates.apiKey = body.api_key
+  if (body.clear_key === true) updates.apiKey = ''
+  else if (typeof body.api_key === 'string' && body.api_key.trim()) updates.apiKey = body.api_key.trim()
   if ('model' in body) updates.model = JSON.stringify(body.model)
   if ('priority' in body) updates.priority = body.priority
   if ('is_active' in body) updates.isActive = body.is_active
+  if ('service_options' in body) {
+    const options = body.service_options
+    if (!options || typeof options !== 'object' || Array.isArray(options) || JSON.stringify(options).length > 100000) return badRequest(c, '服务参数须为不超过100KB的JSON对象')
+    if (/"(?:api_key|apiKey|authorization|secret|secret_key|secretKey|client_secret|clientSecret|api_secret|apiSecret|access_token|accessToken|refresh_token|refreshToken|token)"\s*:/i.test(JSON.stringify(options))) return badRequest(c, '请将服务密钥填在 API Key，不能放入服务参数')
+    let old: Record<string, unknown> = {}
+    try { old = JSON.parse(existing.settings || '{}') } catch { /* old config */ }
+    updates.settings = JSON.stringify({...old, serviceOptions: options})
+  }
   if ('temperature' in body) {
     let temperature: number | null
     try {
@@ -279,7 +317,7 @@ app.put('/:id', async (c) => {
     }
     // 与已有 settings 合并，清空的 temperature 从 JSON 中移除
     let settings: Record<string, any> = {}
-    try { settings = existing.settings ? JSON.parse(existing.settings) : {} } catch { settings = {} }
+    try { settings = updates.settings ? JSON.parse(updates.settings) : existing.settings ? JSON.parse(existing.settings) : {} } catch { settings = {} }
     if (temperature === null) delete settings.temperature
     else settings.temperature = temperature
     updates.settings = Object.keys(settings).length ? JSON.stringify(settings) : null
