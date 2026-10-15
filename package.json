@@ -6,8 +6,11 @@
   "scripts": {
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
+    "dev:frontend-react": "cd frontend-react && npm run dev",
     "dev:desktop": "cd desktop && npm run dev",
     "build:frontend": "cd frontend && npm run generate",
+    "build:frontend-react": "cd frontend-react && npm run build",
+    "test:frontend-react": "cd frontend-react && npm run test",
     "dist": "cd desktop && npm run dist"
   }
 }
