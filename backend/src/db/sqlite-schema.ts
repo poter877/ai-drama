@@ -339,6 +339,42 @@ export const sqliteSchemaStatements = [
     created_at TEXT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_creative_messages_project ON creative_messages(project_id, id)`,
+  `CREATE TABLE IF NOT EXISTS film_projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES dramas(id),
+    style_slug TEXT NOT NULL,
+    topic TEXT NOT NULL DEFAULT '',
+    language TEXT NOT NULL DEFAULT 'zh',
+    duration_sec INTEGER NOT NULL DEFAULT 45,
+    has_voice INTEGER NOT NULL DEFAULT 1,
+    revision INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS film_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES dramas(id),
+    definition TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ready',
+    cursor INTEGER NOT NULL DEFAULT 0,
+    stages TEXT NOT NULL,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS film_render_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES dramas(id),
+    run_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    progress INTEGER NOT NULL DEFAULT 0,
+    phase TEXT,
+    video_url TEXT,
+    poster_url TEXT,
+    srt_url TEXT,
+    error_msg TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS creative_projects (
     project_id INTEGER PRIMARY KEY REFERENCES dramas(id),
     revision INTEGER NOT NULL DEFAULT 1,
@@ -465,11 +501,12 @@ export function initSqliteSchema(sqlite: Database.Database) {
   const dramaColumns = new Set((sqlite.prepare('PRAGMA table_info(dramas)').all() as { name: string }[]).map(c => c.name))
   if (!dramaColumns.has('project_type')) sqlite.exec("ALTER TABLE dramas ADD COLUMN project_type TEXT NOT NULL DEFAULT 'drama'")
   if (!dramaColumns.has('creative_category')) sqlite.exec('ALTER TABLE dramas ADD COLUMN creative_category TEXT')
+  if (!dramaColumns.has('film_style')) sqlite.exec('ALTER TABLE dramas ADD COLUMN film_style TEXT')
   sqlite.exec(`CREATE TRIGGER IF NOT EXISTS creative_no_episode_insert
-    BEFORE INSERT ON episodes WHEN (SELECT project_type FROM dramas WHERE id = NEW.drama_id) = 'creative'
+    BEFORE INSERT ON episodes WHEN (SELECT project_type FROM dramas WHERE id = NEW.drama_id) IN ('creative','film')
     BEGIN SELECT RAISE(ABORT, '创意视频项目不使用剧集'); END`)
   sqlite.exec(`CREATE TRIGGER IF NOT EXISTS creative_no_episode_move
-    BEFORE UPDATE OF drama_id ON episodes WHEN (SELECT project_type FROM dramas WHERE id = NEW.drama_id) = 'creative'
+    BEFORE UPDATE OF drama_id ON episodes WHEN (SELECT project_type FROM dramas WHERE id = NEW.drama_id) IN ('creative','film')
     BEGIN SELECT RAISE(ABORT, '创意视频项目不使用剧集'); END`)
   const insertSeed = sqlite.prepare(SEED_SQL)
   const upgradeSeed = sqlite.prepare(UPGRADE_SQL)

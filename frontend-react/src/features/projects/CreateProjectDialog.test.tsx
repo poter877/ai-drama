@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { creativeCatalogApi } from '@/entities/creative/catalog'
+import { filmStylesApi } from '@/entities/film/model'
 import { publicCreativeCatalog } from '../../../../backend/src/services/creative-catalog'
 import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -47,6 +48,7 @@ function renderDialog(initialPresets = presets) {
 
 beforeEach(async () => {
   vi.spyOn(creativeCatalogApi, 'list').mockResolvedValue(publicCreativeCatalog())
+  vi.spyOn(filmStylesApi, 'groups').mockResolvedValue([])
   await initI18n().changeLanguage('zh')
 })
 
@@ -265,7 +267,7 @@ it('offers only the twelve reference types and omits the two retired categories'
   const user = userEvent.setup()
   renderDialog()
   await user.click(screen.getByRole('radio', {name:'创意视频'}))
-  await screen.findByText(/12 种视频类型/)
+  await screen.findByText(/12 种可选风格/)
   expect(screen.queryByRole('radio',{name:'产品宣传'})).toBeNull()
   expect(screen.queryByRole('radio',{name:'素材混剪'})).toBeNull()
   expect(screen.getAllByRole('radio')).toHaveLength(14) // 2 project kinds + 12 video types

@@ -3,7 +3,7 @@ import { asArray, asRecord, field, parseJsonArray } from '@/shared/api/dto'
 import { mapCharacter, mapProp, mapScene, type Character, type Prop, type Scene } from '@/entities/asset/model'
 import { mapEpisode, type Episode } from '@/entities/episode/model'
 
-export type ProjectType = 'drama' | 'creative'
+export type ProjectType = 'drama' | 'creative' | 'film'
 export type { CreativeCategory } from '@/entities/creative/model'
 import type { CreativeCategory } from '@/entities/creative/model'
 
@@ -11,6 +11,7 @@ export interface Drama {
   id: number
   title: string
   projectType: ProjectType
+  filmStyle: string | null
   creativeCategory: CreativeCategory | null
   description: string
   genre: string
@@ -36,7 +37,8 @@ export function mapDrama(raw: unknown): Drama {
   return {
     id: Number(field(o, 'id') ?? 0),
     title: String(field(o, 'title') ?? ''),
-    projectType: field(o, 'project_type') === 'creative' ? 'creative' : 'drama',
+    projectType: field(o, 'project_type') === 'creative' ? 'creative' : field(o, 'project_type') === 'film' ? 'film' : 'drama',
+    filmStyle: typeof field(o, 'film_style') === 'string' ? field(o, 'film_style') as string : null,
     creativeCategory: typeof field(o, 'creative_category') === 'string' ? field(o, 'creative_category') as string : null,
     description: String(field(o, 'description') ?? ''),
     genre: String(field(o, 'genre') ?? ''),
@@ -57,7 +59,9 @@ export function mapDrama(raw: unknown): Drama {
 }
 
 export function projectPath(project: Pick<Drama, 'id' | 'projectType'>): string {
-  return project.projectType === 'creative' ? `/creative/${project.id}` : `/drama/${project.id}`
+  if (project.projectType === 'creative') return `/creative/${project.id}`
+  if (project.projectType === 'film') return `/film/${project.id}`
+  return `/drama/${project.id}`
 }
 
 export interface DramaListFilters {

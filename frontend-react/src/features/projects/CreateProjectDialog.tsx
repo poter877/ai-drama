@@ -1,8 +1,9 @@
 import { useCreativeCatalog, useCatalogText, useProductionText } from '@/entities/creative/catalog'
+import { filmQueries } from '@/entities/film/model'
 /** 新建项目弹窗：选择项目类型后进入对应的独立制作工作台。 */
 import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookOpen, Check, Clapperboard, Film, Info, Layers, Package, Plus, Sparkles, type LucideIcon } from 'lucide-react'
 import { toastError } from '@/shared/lib/errors'
 import { cn } from '@/shared/lib/cn'
@@ -82,7 +83,9 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
   const [categoryGroup, setCategoryGroup] = useState('all')
   const [categorySearch, setCategorySearch] = useState('')
   const [projectType, setProjectType] = useState<ProjectType>('drama')
-  const [creativeCategory, setCreativeCategory] = useState<CreativeCategory>('explainer')
+  const [creativeCategory, setCreativeCategory] = useState<CreativeCategory | 'film'>('explainer')
+  const [filmStyle, setFilmStyle] = useState('ink-wash')
+  const filmGroups = useQuery(filmQueries.groups())
   const [title, setTitle] = useState('')
   const [style, setStyle] = useState('')
   const [aspectRatio, setAspectRatio] = useState('16:9')
@@ -93,7 +96,15 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
     ? aspectRatioOptions.filter((option) => option.value !== 'adaptive')
     : aspectRatioOptions
 
-  const filteredCategories = catalog.data?.filter(item => (categoryGroup === 'all' || item.group === categoryGroup) && `${localize(item.title)} ${localize(item.description)}`.toLowerCase().includes(categorySearch.trim().toLowerCase())) ?? []
+  const filmFlat = (filmGroups.data ?? []).flatMap((g) => g.styles)
+  const isFilmGroup = categoryGroup === 'film'
+  const filteredFilmStyles = isFilmGroup
+    ? filmFlat.filter((st) => `${st.cn} ${st.en} ${st.category_cn} ${st.line_cn}`.toLowerCase().includes(categorySearch.trim().toLowerCase()))
+    : []
+  const filteredCategories = isFilmGroup
+    ? []
+    : catalog.data?.filter(item => (categoryGroup === 'all' || item.group === categoryGroup) && `${localize(item.title)} ${localize(item.description)}`.toLowerCase().includes(categorySearch.trim().toLowerCase())) ?? []
+  const totalChoices = (catalog.data?.length ?? 0) + filmFlat.length
 
   // 只在重新打开时重置，后台预设刷新不能清空正在编辑的草稿。
   useEffect(() => {
@@ -118,12 +129,16 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
         title: title.trim(),
         style: style || undefined,
         aspect_ratio: aspectRatio,
-        ...(projectType === 'creative' ? { project_type: projectType, creative_category: creativeCategory } : {}),
+        ...(projectType === 'creative'
+          ? creativeCategory === 'film'
+            ? { project_type: 'film' as const, film_style: filmStyle, topic: '', language: 'zh', duration_sec: 45, has_voice: true }
+            : { project_type: 'creative' as const, creative_category: creativeCategory }
+          : {}),
       }),
     onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: qk.dramas() })
       onClose()
-      onCreated(Number((data as { id?: number })?.id), projectType)
+      onCreated(Number((data as { id?: number })?.id), creativeCategory === 'film' ? 'film' : projectType)
     },
     onError: (err) => toastError(err),
   })
@@ -154,7 +169,7 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
             form="create-project-form"
             variant="primary"
             loading={createMutation.isPending}
-            disabled={projectType === 'creative' && !catalog.data?.some(item => item.id === creativeCategory)}
+            disabled={projectType === 'creative' && creativeCategory !== 'film' && !catalog.data?.some(item => item.id === creativeCategory)}
             className="min-w-0 whitespace-normal text-center leading-[1.35]"
           >
             <Plus size={13} strokeWidth={2.2} className="shrink-0" aria-hidden />
@@ -168,7 +183,7 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
         className="flex flex-col gap-5"
         onSubmit={(e) => {
           e.preventDefault()
-          if (createMutation.isPending || !title.trim() || (projectType === 'creative' && !catalog.data?.some(item => item.id === creativeCategory))) return
+          if (createMutation.isPending || !title.trim() || (projectType === 'creative' && creativeCategory !== 'film' && !catalog.data?.some(item => item.id === creativeCategory))) return
           createMutation.mutate()
         }}
       >
@@ -204,13 +219,31 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
           <fieldset className="min-w-0 border-0">
             <legend className={cn(fieldLabelClass, 'mb-2')}>{t('index.createDialog.creativeCategory')}</legend>
             <div className="mb-3 flex flex-wrap gap-2">
-              {(['all', 'story', 'business', 'presenter', 'reuse'] as const).map(group => <Button key={group} size="sm" aria-pressed={categoryGroup === group} disabled={createMutation.isPending} variant={categoryGroup === group ? 'primary' : 'default'} onClick={() => setCategoryGroup(group)}>{({all:words('全部类型','All types'),story:words('故事与视觉','Story & visuals'),business:words('演示与教学','Demos & tutorials'),presenter:words('讲述与出镜','Presenters'),reuse:words('素材再创作','Repurpose')})[group]}</Button>)}
+              {(['all', 'story', 'business', 'presenter', 'reuse', 'film'] as const).map(group => <Button key={group} size="sm" aria-pressed={categoryGroup === group} disabled={createMutation.isPending} variant={categoryGroup === group ? 'primary' : 'default'} onClick={() => setCategoryGroup(group)}>{({all:words('全部类型','All types'),story:words('故事与视觉','Story & visuals'),business:words('演示与教学','Demos & tutorials'),presenter:words('讲述与出镜','Presenters'),reuse:words('素材再创作','Repurpose'),film:words('影片风格 43','Film styles 43')})[group]}</Button>)}
             </div>
             <Input aria-label={words('搜索视频类型','Search video types')} placeholder={words('搜索类型、用途…','Search types and use cases…')} value={categorySearch} onChange={event => setCategorySearch(event.target.value)} disabled={createMutation.isPending} className="mb-3" />
-            <p className="mb-3 text-xs text-content-muted">{words('已选择：','Selected: ')}{localize(catalog.data?.find(item => item.id === creativeCategory)?.title)} · {catalog.data?.length ?? 0} {words('种视频类型','video types')}</p>
+            <p className="mb-3 text-xs text-content-muted">{words('已选择：','Selected: ')}{creativeCategory === 'film' ? `${filmFlat.find((st) => st.slug === filmStyle)?.cn ?? ''}（${words('影片风格','film style')}）` : localize(catalog.data?.find(item => item.id === creativeCategory)?.title)} · {totalChoices} {words('种可选风格','styles')}</p>
             {catalog.isPending && <p role="status">{words('正在加载视频类型…','Loading video types…')}</p>}
             {catalog.isError && <div role="alert">{words('无法加载类型，请重试','Could not load types. Retry.')}<Button onClick={() => void catalog.refetch()}>{words('重试','Retry')}</Button></div>}
-            {catalog.data && !filteredCategories.length && <p role="status" className="py-5 text-center text-sm text-content-muted">{words('没有匹配的类型，试试其他关键词或分类','No matching types. Try another search or group.')}</p>}
+            {catalog.data && !filteredCategories.length && !filteredFilmStyles.length && <p role="status" className="py-5 text-center text-sm text-content-muted">{words('没有匹配的类型，试试其他关键词或分类','No matching types. Try another search or group.')}</p>}
+            {isFilmGroup && (
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {filteredFilmStyles.map((st) => (
+                  <ProjectChoice
+                    key={st.slug}
+                    name="creative-category"
+                    value="film"
+                    title={`${st.cn} · ${st.en}`}
+                    description={`${st.category_cn} ｜ ${st.renderProfile === '3d' ? '3D' : st.renderProfile === 'shader' ? 'Shader' : '2D'}${st.line_cn ? ` ｜ ${st.line_cn}` : ''}`}
+                    icon={Film}
+                    checked={creativeCategory === 'film' && filmStyle === st.slug}
+                    disabled={createMutation.isPending}
+                    onChange={() => { setCreativeCategory('film'); setFilmStyle(st.slug) }}
+                  />
+                ))}
+              </div>
+            )}
+            {!isFilmGroup && (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {filteredCategories.map((item) => (
 
@@ -227,6 +260,7 @@ export function CreateProjectDialog({ open, onClose, stylePresets, aspectRatioOp
                 />
               ))}
             </div>
+            )}
           </fieldset>
         )}
         <label className={fieldClass}>

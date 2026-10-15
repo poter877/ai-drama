@@ -14,6 +14,7 @@ const SettingsRoute = lazy(() => import('@/routes/settings/SettingsRoute'))
 const DramaDetailRoute = lazy(() => import('@/routes/drama/DramaDetailRoute'))
 const EpisodeWorkbenchRoute = lazy(() => import('@/routes/episode/EpisodeWorkbenchRoute'))
 const CreativeRoute = lazy(() => import('@/routes/creative/CreativeRoute'))
+const FilmWorkbenchRoute = lazy(() => import('@/routes/film/FilmWorkbenchRoute'))
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
       { path: '/settings', element: <SettingsRoute /> },
       { path: '/drama/:id', element: <DramaDetailRoute /> },
       { path: '/creative/:id', element: <CreativeRoute /> },
+      { path: '/film/:id', element: <FilmWorkbenchRoute /> },
     ],
   },
   {

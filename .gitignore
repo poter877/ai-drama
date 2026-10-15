@@ -53,6 +53,8 @@ temp/
 # Agent workspace (skills/prompts 为策划模板保持跟踪，其余产出忽略)
 backend/workspace/*
 !backend/workspace/skills/
+!backend/workspace/film-styles/
+backend/workspace/film-styles/**/_guides/*
 !backend/workspace/prompts/
 
 # Desktop (Electron) build artifacts

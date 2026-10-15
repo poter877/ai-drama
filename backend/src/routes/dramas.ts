@@ -5,6 +5,7 @@ import { success, badRequest, notFound, created, now } from '../utils/response.j
 import { toSnakeCase, toSnakeCaseArray } from '../utils/transform.js'
 import { z } from 'zod'
 import { aspectRatioSchema, creativeCategorySchema, createCreativeDocument } from '../services/creative-model.js'
+import { createFilmProject } from '../services/film-pipeline/runs.js'
 
 const app = new Hono()
 
@@ -55,20 +56,24 @@ app.post('/', async (c) => {
   const body = await c.req.json()
   const parsed = z.object({
     title: z.string().trim().min(1).max(200),
-    project_type: z.enum(['drama', 'creative']).default('drama'),
+    project_type: z.enum(['drama', 'creative', 'film']).default('drama'),
     creative_category: creativeCategorySchema.nullish(),
+    film_style: z.string().trim().max(60).nullish(),
     aspect_ratio: aspectRatioSchema.default('16:9'),
     style: z.string().max(100).optional(),
   }).safeParse(body)
   if (!parsed.success) return badRequest(c, parsed.error.issues.map(issue => issue.message).join('；'))
   if (parsed.data.project_type === 'creative' && !parsed.data.creative_category) return badRequest(c, '请选择创意视频用途')
   if (parsed.data.project_type === 'drama' && parsed.data.creative_category) return badRequest(c, '短剧项目不能设置创意视频用途')
+  if (parsed.data.project_type === 'film' && !parsed.data.film_style) return badRequest(c, '请选择影片风格')
+  if (parsed.data.project_type !== 'film' && parsed.data.film_style) return badRequest(c, '只有影片风格项目能设置 film_style')
   const ts = now()
-  const result = db.transaction(tx => {
+  const result = db.transaction((tx) => {
     const res = tx.insert(schema.dramas).values({
       title: parsed.data.title,
       projectType: parsed.data.project_type,
       creativeCategory: parsed.data.creative_category || null,
+      filmStyle: parsed.data.film_style || null,
       description: body.description,
       genre: body.genre,
       style: parsed.data.style,
@@ -83,6 +88,16 @@ app.post('/', async (c) => {
     if (parsed.data.project_type === 'creative') tx.insert(schema.creativeProjects).values({
       projectId: id, document: JSON.stringify(createCreativeDocument(parsed.data.creative_category!)), revision: 1, updatedAt: ts,
     }).run()
+    if (parsed.data.project_type === 'film') {
+      createFilmProject({
+        projectId: id,
+        styleSlug: parsed.data.film_style!,
+        topic: typeof body.topic === 'string' ? body.topic : '',
+        language: typeof body.language === 'string' && body.language ? body.language : 'zh',
+        durationSec: Number.isFinite(Number(body.duration_sec)) && Number(body.duration_sec) > 0 ? Math.round(Number(body.duration_sec)) : 45,
+        hasVoice: body.has_voice !== false,
+      })
+    }
     return tx.select().from(schema.dramas).where(eq(schema.dramas.id, id)).get()!
   })
 

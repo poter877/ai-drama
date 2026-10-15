@@ -18,7 +18,7 @@ export const dramaApi = {
     return mapDrama(await api.get<unknown>(`/dramas/${id}`, { signal }))
   },
 
-  create(data: { title: string; style?: string; aspect_ratio?: string; description?: string; genre?: string; project_type?: ProjectType; creative_category?: CreativeCategory }): Promise<unknown> {
+  create(data: { title: string; style?: string; aspect_ratio?: string; description?: string; genre?: string; project_type?: ProjectType; creative_category?: CreativeCategory; film_style?: string; topic?: string; language?: string; duration_sec?: number; has_voice?: boolean }): Promise<unknown> {
     return api.post('/dramas', data)
   },
 

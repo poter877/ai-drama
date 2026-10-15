@@ -1,6 +1,8 @@
 import { toolboxService } from './services/production-tools/jobs.js'
 import { creativeToolService } from './services/creative-tools/jobs.js'
 import { recoverCreativePipelines } from './services/creative-pipeline/runner.js'
+import { recoverFilmRuns } from './services/film-pipeline/runs.js'
+import { recoverFilmRenderJobs } from './services/film-pipeline/render.js'
 import 'dotenv/config'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
@@ -11,6 +13,7 @@ import { fileURLToPath } from 'url'
 
 import dramas from './routes/dramas.js'
 import creative from './routes/creative.js'
+import film from './routes/film.js'
 import { recoverCreativeRenders } from './services/creative-projects.js'
 import episodes from './routes/episodes.js'
 import storyboards from './routes/storyboards.js'
@@ -58,6 +61,7 @@ app.get('/api/v1/health', (c) => c.json({
 const api = new Hono()
 api.route('/dramas', dramas)
 api.route('/creative', creative)
+api.route('/film', film)
 api.route('/episodes', episodes)
 api.route('/storyboards', storyboards)
 api.route('/scenes', scenes)
@@ -101,6 +105,8 @@ app.get('*', serveStatic({ root: distPath, path: 'index.html' }))
 const port = Number(process.env.PORT || 5679)
 recoverCreativeRenders()
 recoverCreativePipelines()
+recoverFilmRuns()
+recoverFilmRenderJobs()
 creativeToolService.recover()
 toolboxService.recover()
 db.update(schema.creativeMessages).set({ status: 'failed' }).where(eq(schema.creativeMessages.status, 'pending')).run()
