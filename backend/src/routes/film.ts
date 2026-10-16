@@ -19,6 +19,7 @@ import {
   filmWorkdirListing,
 } from '../services/film-pipeline/runs.js'
 import { readFilmAgentLog } from '../services/film-pipeline/build-agent.js'
+import { detectBlenderPath, blenderVersion } from '../services/film-pipeline/blender.js'
 import { filmProjectDir, filmStaticUrl } from '../services/film-pipeline/render.js'
 
 const film = new Hono()
@@ -26,6 +27,12 @@ const film = new Hono()
 film.get('/styles', (c) => {
   const flat = c.req.query('flat') === '1'
   return success(c, flat ? filmStyles() : filmStyleGroups())
+})
+
+// 本机 Blender 可用性（build agent 的 run_blender 工具按此注册）
+film.get('/blender/status', async (c) => {
+  const exe = detectBlenderPath()
+  return success(c, { available: Boolean(exe), path: exe, version: exe ? await blenderVersion(exe) : null })
 })
 
 film.get('/styles/:slug', (c) => {

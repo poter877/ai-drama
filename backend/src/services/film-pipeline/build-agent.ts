@@ -9,11 +9,13 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
-import { ToolLoopAgent, stepCountIs } from 'ai'
+import { ToolLoopAgent, stepCountIs, type ToolSet } from 'ai'
 import { z } from 'zod'
 import { getTextModel } from '../ai-text.js'
 import { FilmError } from './contracts.js'
 import { filmProjectDir } from './render.js'
+import { detectBlenderPath, runBlenderHeadless } from './blender.js'
+import { generateTextureImage, hasImageModel } from './textures.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -61,22 +63,24 @@ export async function runBuildAgent(input: BuildAgentInput): Promise<{ summary: 
 
   const model = await getTextModel()
   const written = new Set<string>()
+  const blenderPath = detectBlenderPath()
+  const textureReady = await hasImageModel()
+  if (blenderPath) log(`检测到 Blender：${blenderPath}`)
+  if (textureReady) log('图片模型可用：generate_texture 已启用')
 
-  const agent = new ToolLoopAgent({
-    id: `film-build-${input.styleSlug}`,
-    model,
-    instructions: [
-      `你是影片工程搭建师。用纯代码（Canvas/WebGL/three.js + 采样音频）制作一支 ${input.durationSec} 秒、画幅 ${input.aspectRatio} 的短片工程。语言：${input.language}（代码/标识符用英文）。`,
-      `=== 风格不变量（逐条遵守）===\n${input.styleMd}`,
-      input.systemExtra,
-      `\n=== 工程契约（必须满足）===`,
-      `- 在当前目录写 index.html，暴露：window.DUR（秒）、window.render(t)（确定性逐帧绘制）、window.READY=true；`,
-      `- 库文件用绝对路径引用（/core/lib.js、/node_modules/three/build/three.module.js）；`,
-      `- 确定性：无 Date.now()、无未播种随机（可用 /core/lib.js 的 mulberry/hash）、不跨帧保存状态；`,
-      `- 完成后调用 done 工具声明结束。只允许改动当前工作目录内的文件。`,
-      `\n=== 导演阐述（已确认）===\n${input.acceptedContent.slice(0, 20000)}`,
-    ].join('\n'),
-    tools: {
+  let instructions = [
+    `你是影片工程搭建师。用纯代码（Canvas/WebGL/three.js + 采样音频）制作一支 ${input.durationSec} 秒、画幅 ${input.aspectRatio} 的短片工程。语言：${input.language}（代码/标识符用英文）。`,
+    `=== 风格不变量（逐条遵守）===\n${input.styleMd}`,
+    input.systemExtra,
+    `\n=== 工程契约（必须满足）===`,
+    `- 在当前目录写 index.html，暴露：window.DUR（秒）、window.render(t)（确定性逐帧绘制）、window.READY=true；`,
+    `- 库文件用绝对路径引用（/core/lib.js、/node_modules/three/build/three.module.js）；`,
+    `- 确定性：无 Date.now()、无未播种随机（可用 /core/lib.js 的 mulberry/hash）、不跨帧保存状态；`,
+    `- 完成后调用 done 工具声明结束。只允许改动当前工作目录内的文件。`,
+    `\n=== 导演阐述（已确认）===\n${input.acceptedContent.slice(0, 20000)}`,
+  ].join('\n')
+
+  const tools: ToolSet = {
       write_file: {
         description: '在影片工程目录内写入一个文件（相对路径，禁止 ../）',
         inputSchema: z.object({ path: z.string().describe('相对路径，如 index.html、ink.js'), content: z.string() }),
@@ -153,7 +157,85 @@ export async function runBuildAgent(input: BuildAgentInput): Promise<{ summary: 
           return summary
         },
       },
-    },
+  }
+
+  // 可选高级资产链路：本机装了 Blender → 无头 bpy 建模/导出；配了图片模型 → 生成贴图
+  if (blenderPath) {
+    tools['run_blender'] = {
+      description: '无头运行一个 bpy 脚本（先用 write_file 写好 .py 再调用）。用于建模、导出 GLB 资产、渲染 PNG 自检。固定相机与种子，禁止随机。脚本内用 sys.argv[sys.argv.index("--")+1:] 取业务参数（[0]=输出图绝对路径）。',
+      inputSchema: z.object({
+        script: z.string().describe('工程内 .py 脚本的相对路径'),
+        output_image: z.string().describe('脚本将渲染结果 PNG/JPG 写到的相对路径（自检用；脚本从 sys.argv[1] 拿到它的绝对路径）'),
+        args: z.array(z.string()).describe('追加传给脚本的参数（sys.argv[2:]）').optional(),
+      }),
+      execute: async ({ script: rel, output_image: outRel, args }: { script: string; output_image: string; args?: string[] }) => {
+        const scriptAbs = safeJoin(dir, rel)
+        if (!fs.existsSync(scriptAbs)) return `脚本不存在：${rel}（先用 write_file 写好）`
+        const outAbs = safeJoin(dir, outRel)
+        fs.mkdirSync(path.dirname(outAbs), { recursive: true })
+        log(`run_blender ${rel}${args?.length ? ` ${args.join(' ')}` : ''}`)
+        try {
+          const r = await runBlenderHeadless({ exe: blenderPath, scriptPath: scriptAbs, cwd: dir, args: [outAbs, ...(args ?? [])], timeoutMs: 300_000 })
+          log(`run_blender ok (${Math.round(r.durationMs / 1000)}s)`)
+          const tail = r.stdout.trim().split('\n').slice(-15).join('\n').slice(-1500)
+          if (!fs.existsSync(outAbs)) {
+            return { type: 'text' as const, value: `脚本执行成功但没有产出 ${outRel}。输出尾部：\n${tail}` }
+          }
+          const img = fs.readFileSync(outAbs)
+          return {
+            type: 'content' as const,
+            value: [
+              { type: 'text' as const, text: `Blender 渲染完成（${outRel}，${Math.round(img.length / 1024)}KB，${Math.round(r.durationMs / 1000)}s）。请自检视觉效果。\n输出尾部：\n${tail}` },
+              { type: 'image' as const, image: img, mimeType: outAbs.endsWith('.jpg') || outAbs.endsWith('.jpeg') ? 'image/jpeg' : 'image/png' },
+            ],
+          }
+        } catch (e) {
+          const msg = `run_blender 失败：${(e as Error).message.slice(0, 800)}`
+          log(msg)
+          return { type: 'text' as const, value: msg }
+        }
+      },
+    }
+  }
+  if (textureReady) {
+    tools['generate_texture'] = {
+      description: '用图片模型生成一张贴图 PNG 落到工程目录。提示词必须写明：flat lighting、no shadows/highlights、seamless tileable texture、纯外观无光照；供 Blender/three.js 当 albedo 用。',
+      inputSchema: z.object({
+        prompt: z.string().describe('贴图内容描述（记得加 flat lighting / seamless / texture only 约束）'),
+        filename: z.string().describe('保存的相对路径，如 assets/rust_metal.png'),
+      }),
+      execute: async ({ prompt, filename }: { prompt: string; filename: string }) => {
+        const target = safeJoin(dir, filename)
+        fs.mkdirSync(path.dirname(target), { recursive: true })
+        log(`generate_texture ${filename}`)
+        const { bytes, mimeType } = await generateTextureImage({ prompt })
+        fs.writeFileSync(target, bytes)
+        written.add(path.normalize(filename))
+        const ext = mimeType.includes('jpeg') ? 'jpg' : 'png'
+        log(`generate_texture ok → ${filename} (${Math.round(bytes.length / 1024)}KB ${mimeType})`)
+        return `贴图已保存：${filename}（${mimeType}，${Math.round(bytes.length / 1024)}KB${ext === 'jpg' ? '，若需 PNG 请在提示词注明' : ''}）`
+      },
+    }
+  }
+
+  if (blenderPath) {
+    instructions += [
+      `\n\n=== 可选：Blender 资产链路（本机已检测到 Blender）===`,
+      `- 需要精细硬表面模型（机械、建筑、道具）时：先用 write_file 写 bpy 脚本，再调用 run_blender 无头执行；`,
+      `- 脚本契约：业务参数从 "--" 之后的 sys.argv 取（args = sys.argv[sys.argv.index('--')+1:]，args[0]=输出图绝对路径，args[1:]=追加参数；注意 Blender 的 sys.argv 含完整命令行，sys.argv[1] 是 --background 不是业务参数）；固定相机/种子，禁用随机与帧间状态；`,
+      `- 建 GLB 资产用 bpy.ops.export_scene.gltf(filepath=…) 导出，index.html 用 /node_modules/three/examples/jsm/loaders/GLTFLoader.js 加载，全部加载完成后再置 window.READY=true；`,
+      `- 用 render_frame 或 run_blender 的输出图自检视觉；最终契约不变（index.html 暴露 DUR/render/READY）。`,
+    ].join('\n')
+  }
+  if (textureReady) {
+    instructions += `\n\n可选：generate_texture 可用图片模型生成贴图（提示词须含 flat lighting / seamless / texture only，无光影），供材质 albedo 使用。`
+  }
+
+  const agent = new ToolLoopAgent({
+    id: `film-build-${input.styleSlug}`,
+    model,
+    instructions,
+    tools,
     stopWhen: [stepCountIs(60)],
     onStepStart: ({ stepNumber }) => log(`— step ${stepNumber} —`),
     onStepFinish: ({ content }) => {
